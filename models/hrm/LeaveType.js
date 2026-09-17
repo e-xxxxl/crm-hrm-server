@@ -6,6 +6,7 @@ const { Schema } = mongoose;
 
 export const LEAVE_CATEGORIES = [
   "annual",
+  "casual",
   "sick",
   "maternity",
   "paternity",

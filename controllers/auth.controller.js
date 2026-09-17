@@ -66,6 +66,7 @@ export const me = catchAsync(async (req, res) => {
         role: req.auth.role,
         organizationId: req.auth.organizationId,
         organizationName: req.auth.organizationName,
+        organizationType: req.auth.organizationType,
         organizationStrategy: req.auth.organizationStrategy,
         permissions: req.auth.permissions,
       },

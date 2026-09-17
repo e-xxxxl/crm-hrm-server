@@ -157,9 +157,6 @@ export async function createRequest(orgId, actor, input, { onBehalf = false } = 
   const startDate = new Date(input.startDate);
   const endDate = new Date(input.endDate);
   if (endDate < startDate) throw AppError.badRequest("End date cannot be before start date");
-  if (input.supportingDocumentUrl == null && type.requiresDocument && !onBehalf) {
-    throw AppError.badRequest(`${type.name} requires a supporting document`);
-  }
   if ((input.halfDayStart || input.halfDayEnd) && !type.allowHalfDay) {
     throw AppError.badRequest(`${type.name} cannot be taken as a half day`);
   }
@@ -188,7 +185,6 @@ export async function createRequest(orgId, actor, input, { onBehalf = false } = 
   }
 
   const reference = await nextCode("LV", `${orgId}:leave`, 5);
-  const noManager = !employee.reportingManager;
 
   const request = await LeaveRequest.create({
     organizationId: orgId,
@@ -207,10 +203,11 @@ export async function createRequest(orgId, actor, input, { onBehalf = false } = 
     supportingDocumentUrl: input.supportingDocumentUrl,
     contactWhileAway: input.contactWhileAway,
     lineManager: employee.reportingManager?._id,
-    status: noManager ? "Manager Approved" : "Pending",
-    decisions: noManager
-      ? [{ stage: "manager", action: "approved", comment: "No line manager on record — routed to HR", at: new Date() }]
-      : [],
+    // Always starts awaiting a real decision — no line manager on record just
+    // means HR (who can act on any request regardless of assigned manager,
+    // see managerDecision below) has to clear the manager stage themselves.
+    status: "Pending",
+    decisions: [],
     createdBy: actor.userId,
   });
 

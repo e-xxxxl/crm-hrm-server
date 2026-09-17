@@ -74,7 +74,7 @@ export async function login(email, password) {
 export async function selectOrg(userId, organizationId, ctx = {}) {
   const user = await User.findById(userId)
     .select("+twoFactor.secret +twoFactor.recoveryCodes +sessions")
-    .populate("memberships.organization", "name slug code status payrollStrategy");
+    .populate("memberships.organization", "name slug code type status payrollStrategy");
   if (!user || user.status !== "active") {
     throw AppError.unauthorized("Account not found or disabled");
   }
@@ -117,6 +117,7 @@ export async function selectOrg(userId, organizationId, ctx = {}) {
     role: membership.role,
     organizationId: String(org._id),
     organizationName: org.name,
+    organizationType: org.type,
     organizationStrategy: org.payrollStrategy,
     permissions,
   };
@@ -157,7 +158,7 @@ export async function refresh(refreshToken, ctx = {}) {
 
   const user = await User.findById(decoded.userId)
     .select("+sessions")
-    .populate("memberships.organization", "name slug code status payrollStrategy");
+    .populate("memberships.organization", "name slug code type status payrollStrategy");
   if (!user || user.status !== "active") throw AppError.unauthorized("Account not found");
 
   const presentedHash = hashToken(refreshToken);
@@ -195,6 +196,7 @@ export async function refresh(refreshToken, ctx = {}) {
     role: membership.role,
     organizationId: String(org._id),
     organizationName: org.name,
+    organizationType: org.type,
     organizationStrategy: org.payrollStrategy,
     permissions,
   };

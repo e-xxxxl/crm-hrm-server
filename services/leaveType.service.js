@@ -6,11 +6,8 @@ import { escapeRegex } from "../utils/query.js";
 /** Sensible starting set, created on demand when an org has none. */
 export const DEFAULT_LEAVE_TYPES = [
   { name: "Annual Leave", code: "ANNUAL", category: "annual", paid: true, defaultDaysPerYear: 20, accrual: "annual", carryOverMaxDays: 5, minNoticeDays: 3 },
-  { name: "Sick Leave", code: "SICK", category: "sick", paid: true, defaultDaysPerYear: 12, accrual: "annual", requiresDocument: true, minNoticeDays: 0 },
+  { name: "Casual Leave", code: "CASUAL", category: "casual", paid: true, defaultDaysPerYear: 7, accrual: "annual", minNoticeDays: 1 },
   { name: "Maternity Leave", code: "MATERNITY", category: "maternity", paid: true, defaultDaysPerYear: 112, accrual: "none", genderEligibility: "Female", includeWeekends: true, requiresDocument: true, minNoticeDays: 30 },
-  { name: "Paternity Leave", code: "PATERNITY", category: "paternity", paid: true, defaultDaysPerYear: 10, accrual: "none", genderEligibility: "Male", minNoticeDays: 14 },
-  { name: "Compassionate Leave", code: "COMPASSION", category: "compassionate", paid: true, defaultDaysPerYear: 5, accrual: "annual", minNoticeDays: 0 },
-  { name: "Unpaid Leave", code: "UNPAID", category: "unpaid", paid: false, defaultDaysPerYear: 0, accrual: "none", minNoticeDays: 7 },
 ];
 
 export async function ensureDefaults(orgId) {

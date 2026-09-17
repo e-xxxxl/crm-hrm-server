@@ -29,6 +29,7 @@ export function verifyToken(req, res, next) {
     role: claims.role,
     organizationId: claims.organizationId,
     organizationName: claims.organizationName,
+    organizationType: claims.organizationType,
     organizationStrategy: claims.organizationStrategy,
     permissions: Array.isArray(claims.permissions) ? claims.permissions : [],
   };
