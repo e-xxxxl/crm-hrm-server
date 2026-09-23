@@ -20,7 +20,18 @@ export const upload = catchAsync(async (req, res) => {
 });
 
 export const download = catchAsync(async (req, res) => {
-  const { record, filePath } = await getFileForDownload(req.orgId, req.params.id);
+  const { record, remoteUrl, filePath } = await getFileForDownload(req.orgId, req.params.id);
+
+  if (remoteUrl) {
+    // Cloudinary-hosted — redirect there. `fl_attachment` forces a download
+    // (with the original filename) instead of an inline view.
+    const url = req.query.download
+      ? remoteUrl.replace("/upload/", `/upload/fl_attachment:${encodeURIComponent(record.originalName || "file")}/`)
+      : remoteUrl;
+    return res.redirect(302, url);
+  }
+
+  // Legacy local-disk record.
   res.setHeader("Content-Type", record.mimeType || "application/octet-stream");
   res.setHeader(
     "Content-Disposition",

@@ -73,7 +73,10 @@ export const PERMISSIONS = {
   recruitment: ["recruitment:read", "recruitment:write", "recruitment:move_stage"],
 
   // HRM — documents
-  document: ["document:read", "document:write", "document:delete"],
+  document: ["document:read", "document:write", "document:write_own", "document:delete"],
+
+  // HRM — trainings
+  training: ["training:read", "training:write"],
 
   // HRM — disciplinary (restricted)
   disciplinary: ["disciplinary:read", "disciplinary:write"],
@@ -122,6 +125,7 @@ export const ROLE_PERMISSIONS = {
     ...P.target,
     ...P.recruitment,
     ...P.document,
+    ...P.training,
     ...P.disciplinary,
     ...P.notification,
     ...P.report,
@@ -152,6 +156,7 @@ export const ROLE_PERMISSIONS = {
     ...P.target,
     ...P.recruitment,
     ...P.document,
+    "training:read",
     ...P.disciplinary,
     ...P.notification,
     ...P.report,
@@ -185,6 +190,7 @@ export const ROLE_PERMISSIONS = {
     ...P.target,
     ...P.recruitment,
     ...P.document,
+    "training:read",
     ...P.disciplinary,
     "notification:read",
     "report:hr",
@@ -314,6 +320,12 @@ export const ROLE_PERMISSIONS = {
     "report:crm",
   ],
 
+  // Every employee-tier role also gets a baseline CRM working set (not just
+  // read access) so they can switch into the CRM workspace and do real work
+  // there — creating/updating customers, tickets and tasks, logging
+  // communications. Every write still runs through the normal controllers,
+  // so it's attributed to them via audit log + createdBy/uploadedBy exactly
+  // like everyone else's actions.
   "Rider": [
     "org:read",
     "notification:read",
@@ -324,6 +336,21 @@ export const ROLE_PERMISSIONS = {
     "payroll:read_own",
     "rider:job",
     "shipment:read",
+    "order:read",
+    "document:read",
+    "document:write_own",
+    "training:read",
+    "customer:read",
+    "customer:write",
+    "ticket:read",
+    "ticket:write",
+    "lead:read",
+    "business:read",
+    "review:read",
+    "task:read",
+    "task:write",
+    "communication:read",
+    "communication:write",
   ],
 
   "Staff": [
@@ -338,6 +365,21 @@ export const ROLE_PERMISSIONS = {
     "target:read",
     "target:update_progress",
     "document:read",
+    "document:write_own",
+    "training:read",
+    "customer:read",
+    "customer:write",
+    "ticket:read",
+    "ticket:write",
+    "shipment:read",
+    "order:read",
+    "lead:read",
+    "business:read",
+    "review:read",
+    "task:read",
+    "task:write",
+    "communication:read",
+    "communication:write",
   ],
 };
 

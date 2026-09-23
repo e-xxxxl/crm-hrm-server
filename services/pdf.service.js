@@ -84,8 +84,8 @@ export function generatePayslipPdf(payslip, organization) {
       .font("Helvetica")
       .fillColor("#666")
       .text(
-        `PAYE ${NGN(payslip.paye)} · Pension employee ${NGN(payslip.pensionEmployee)} · ` +
-          `Pension employer ${NGN(payslip.pensionEmployer)}` +
+        `PAYE (employee) ${NGN(payslip.paye)} · PAYE (company) ${NGN(payslip.payeEmployer)} · ` +
+          `Pension employee ${NGN(payslip.pensionEmployee)} · Pension employer ${NGN(payslip.pensionEmployer)}` +
           (payslip.nhf ? ` · NHF ${NGN(payslip.nhf)}` : "") +
           (payslip.tripCount ? ` · Trips ${payslip.tripCount}` : ""),
         left,

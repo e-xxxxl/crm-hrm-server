@@ -4,6 +4,7 @@ import { Employee } from "../models/hrm/Employee.js";
 import { Organization } from "../models/hrm/Organization.js";
 import { Branch } from "../models/hrm/Branch.js";
 import { AppError } from "../utils/AppError.js";
+import { hasPermission } from "../utils/permissions.js";
 import { evaluateGeofence, reverseGeocode } from "../utils/geo.js";
 import {
   dayKey as toDayKey,
@@ -441,6 +442,79 @@ function decorate(doc, employee) {
   return json;
 }
 
+/**
+ * Ranks active employees by clock-in punctuality: how often they clock in
+ * genuinely before the org's standard start time ("early") vs how often
+ * they're marked Late (beyond the grace period). Ranked by (early - late)
+ * descending, ties broken by more early days.
+ */
+export async function punctualityRanking(orgId, actor, query = {}) {
+  const settings = await orgSettings(orgId);
+  const tz = settings.timezone || "Africa/Lagos";
+  const standard = hhmmToMinutes(settings.standardClockIn || "08:00");
+
+  const filter = { organizationId: orgId, "clockIn.at": { $exists: true } };
+  if (query.from || query.to) {
+    filter.dayKey = {};
+    if (query.from) filter.dayKey.$gte = query.from;
+    if (query.to) filter.dayKey.$lte = query.to;
+  }
+  if (query.branch) filter.branch = query.branch;
+
+  const records = await Attendance.find(filter).select("employee clockIn status").lean();
+
+  const byEmp = new Map();
+  for (const r of records) {
+    const key = String(r.employee);
+    if (!byEmp.has(key)) byEmp.set(key, { timesEarly: 0, timesLate: 0, timesOnTime: 0, total: 0 });
+    const agg = byEmp.get(key);
+    agg.total += 1;
+    const clockMinutes = minutesOfDay(r.clockIn.at, tz);
+    if (clockMinutes < standard) agg.timesEarly += 1;
+    else if (r.status === "Late") agg.timesLate += 1;
+    else agg.timesOnTime += 1;
+  }
+
+  const empFilter = { organizationId: orgId, status: "active", _id: { $in: [...byEmp.keys()] } };
+  if (query.department) empFilter.department = query.department;
+  const employees = await Employee.find(empFilter)
+    .select("firstName lastName employeeId department branch")
+    .populate("department", "name")
+    .populate("branch", "name");
+
+  const rows = employees
+    .map((e) => {
+      const agg = byEmp.get(String(e._id));
+      return {
+        employee: {
+          id: e._id,
+          name: e.fullName,
+          employeeId: e.employeeId,
+          department: e.department?.name || null,
+          branch: e.branch?.name || null,
+        },
+        timesEarly: agg.timesEarly,
+        timesLate: agg.timesLate,
+        timesOnTime: agg.timesOnTime,
+        totalDays: agg.total,
+        score: agg.timesEarly - agg.timesLate,
+      };
+    })
+    .sort((a, b) => b.score - a.score || b.timesEarly - a.timesEarly);
+
+  rows.forEach((r, i) => {
+    r.rank = i + 1;
+  });
+
+  // Without oversight permission, only your own row — rank still reflects
+  // your true position in the full org-wide ranking above.
+  if (!hasPermission(actor.permissions, "attendance:report")) {
+    const me = await Employee.findOne({ organizationId: orgId, user: actor.userId }).select("_id");
+    return rows.filter((r) => me && String(r.employee.id) === String(me._id));
+  }
+  return rows;
+}
+
 export default {
   clockIn,
   clockOut,
@@ -449,4 +523,5 @@ export default {
   listRecords,
   monthlyReport,
   manualUpsert,
+  punctualityRanking,
 };

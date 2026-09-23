@@ -22,8 +22,10 @@ export function calculatePayslip({
   const basic = structure.basic || 0;
   const housing = structure.housing || 0;
   const transport = structure.transport || 0;
-  const hazard = structure.hazard || 0;
-  const meal = structure.meal || 0;
+  const subsidy = structure.subsidy || 0;
+  const dataAllowance = structure.dataAllowance || 0;
+  const exGratia = structure.exGratia || 0;
+  const referralBonus = structure.referralBonus || 0;
   const custom = structure.customEarnings || [];
 
   if (strategy === "fixed-monthly") {
@@ -33,6 +35,8 @@ export function calculatePayslip({
     if (basic) earnings.push({ label: "Base salary", amount: roundMoney(basic) });
     if (housing) earnings.push({ label: "Housing allowance", amount: roundMoney(housing) });
     if (transport) earnings.push({ label: "Transport allowance", amount: roundMoney(transport) });
+    if (exGratia) earnings.push({ label: "Ex gratia", amount: roundMoney(exGratia) });
+    if (referralBonus) earnings.push({ label: "Referral bonus", amount: roundMoney(referralBonus) });
     for (const c of custom) earnings.push({ label: c.name, amount: roundMoney(c.amount) });
     commission =
       tripAmountTotal != null
@@ -46,8 +50,10 @@ export function calculatePayslip({
     if (basic) earnings.push({ label: "Basic", amount: roundMoney(basic) });
     if (housing) earnings.push({ label: "Housing allowance", amount: roundMoney(housing) });
     if (transport) earnings.push({ label: "Transport allowance", amount: roundMoney(transport) });
-    if (hazard) earnings.push({ label: "Hazard allowance", amount: roundMoney(hazard) });
-    if (meal) earnings.push({ label: "Meal allowance", amount: roundMoney(meal) });
+    if (subsidy) earnings.push({ label: "Subsidy", amount: roundMoney(subsidy) });
+    if (dataAllowance) earnings.push({ label: "Data allowance", amount: roundMoney(dataAllowance) });
+    if (exGratia) earnings.push({ label: "Ex gratia", amount: roundMoney(exGratia) });
+    if (referralBonus) earnings.push({ label: "Referral bonus", amount: roundMoney(referralBonus) });
     for (const c of custom) earnings.push({ label: c.name, amount: roundMoney(c.amount) });
   }
 
@@ -82,16 +88,20 @@ export function calculatePayslip({
     if (nhf > 0) deductions.push({ label: "NHF (2.5%)", amount: nhf });
   }
 
-  // PAYE — annualise the month's taxable gross.
+  // PAYE — annualise the month's taxable gross. Company policy: only the
+  // employee's half is deducted from pay; the employer half is reported but
+  // not withheld (see computePAYE).
   let taxDetail = null;
   let paye = 0;
+  let payeEmployer = 0;
   if (structure.payeApplicable) {
     taxDetail = computePAYE(taxableGross * 12, {
       pensionAnnual: pension.employee * 12,
       nhfAnnual: nhf * 12,
     });
-    paye = taxDetail.monthlyTax;
-    if (paye > 0) deductions.push({ label: "PAYE tax", amount: paye });
+    paye = taxDetail.employeeMonthlyTax;
+    payeEmployer = taxDetail.employerMonthlyTax;
+    if (paye > 0) deductions.push({ label: "PAYE tax (employee half)", amount: paye });
   }
 
   const totalDeductions = roundMoney(deductions.reduce((s, d) => s + d.amount, 0));
@@ -105,6 +115,7 @@ export function calculatePayslip({
     tripCount,
     deductions,
     paye,
+    payeEmployer,
     pensionEmployee: pension.employee,
     pensionEmployer: pension.employer,
     nhf,
@@ -117,7 +128,10 @@ export function calculatePayslip({
 
 function fixedComponentsTotal(s) {
   const custom = (s.customEarnings || []).reduce((sum, c) => sum + (c.amount || 0), 0);
-  return (s.basic || 0) + (s.housing || 0) + (s.transport || 0) + (s.hazard || 0) + (s.meal || 0) + custom;
+  return (
+    (s.basic || 0) + (s.housing || 0) + (s.transport || 0) + (s.subsidy || 0) + (s.dataAllowance || 0) +
+    (s.exGratia || 0) + (s.referralBonus || 0) + custom
+  );
 }
 
 function pensionableBase(s) {

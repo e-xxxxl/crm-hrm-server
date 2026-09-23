@@ -33,8 +33,10 @@ const salaryStructureSchema = new Schema(
     basic: { type: Number, default: 0, min: 0 },
     housing: { type: Number, default: 0, min: 0 },
     transport: { type: Number, default: 0, min: 0 },
-    hazard: { type: Number, default: 0, min: 0 },
-    meal: { type: Number, default: 0, min: 0 },
+    subsidy: { type: Number, default: 0, min: 0 }, // formerly "hazard"
+    dataAllowance: { type: Number, default: 0, min: 0 }, // formerly "meal"
+    exGratia: { type: Number, default: 0, min: 0 },
+    referralBonus: { type: Number, default: 0, min: 0 },
     customEarnings: { type: [customComponent], default: [] },
 
     // Strategy-specific
@@ -57,7 +59,9 @@ salaryStructureSchema.index({ organizationId: 1, employee: 1, isCurrent: 1 });
 /** Sum of all fixed monthly earnings (excludes variable commission). */
 salaryStructureSchema.virtual("fixedGross").get(function () {
   const custom = (this.customEarnings || []).reduce((s, c) => s + (c.amount || 0), 0);
-  const components = this.basic + this.housing + this.transport + this.hazard + this.meal + custom;
+  const components =
+    this.basic + this.housing + this.transport + this.subsidy + this.dataAllowance +
+    this.exGratia + this.referralBonus + custom;
   return this.grossMonthly > 0 && components === 0 ? this.grossMonthly : components || this.grossMonthly;
 });
 

@@ -33,6 +33,22 @@ export const selectOrg = catchAsync(async (req, res) => {
   res.json({ data: { user, accessToken, session: claims } });
 });
 
+/**
+ * POST /api/auth/switch-org — in-app org switch for a user already signed in
+ * (must already hold an active membership there). Re-issues both tokens for
+ * the new org, same as select-org, without repeating 2FA.
+ */
+export const switchOrg = catchAsync(async (req, res) => {
+  const { organizationId } = req.body;
+  const { user, accessToken, refreshToken, claims } = await authService.switchOrg(
+    req.auth.userId,
+    organizationId,
+    requestContext(req),
+  );
+  setRefreshCookie(res, refreshToken);
+  res.json({ data: { user, accessToken, session: claims } });
+});
+
 /** POST /api/auth/refresh — rotate the refresh token, return a new access token. */
 export const refresh = catchAsync(async (req, res) => {
   const token = readRefreshCookie(req);
@@ -56,9 +72,15 @@ export const logout = catchAsync(async (req, res) => {
 export const me = catchAsync(async (req, res) => {
   const user = await User.findById(req.auth.userId).populate(
     "memberships.organization",
-    "name code slug status",
+    "name code slug status logoUrl",
   );
   if (!user) throw AppError.unauthorized();
+
+  // The JWT's organizationLogoUrl was baked in at login/refresh time — read
+  // it live off the membership instead so a just-changed logo (Branding
+  // settings) shows immediately, without waiting for the next token reissue.
+  const currentOrg = user.membershipFor(req.auth.organizationId)?.organization;
+
   res.json({
     data: {
       user,
@@ -67,6 +89,7 @@ export const me = catchAsync(async (req, res) => {
         organizationId: req.auth.organizationId,
         organizationName: req.auth.organizationName,
         organizationType: req.auth.organizationType,
+        organizationLogoUrl: currentOrg?.logoUrl ?? req.auth.organizationLogoUrl,
         organizationStrategy: req.auth.organizationStrategy,
         permissions: req.auth.permissions,
       },

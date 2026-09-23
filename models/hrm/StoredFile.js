@@ -5,13 +5,17 @@ import { registerModel } from "../registerModel.js";
 const { Schema } = mongoose;
 
 /**
- * Metadata for an uploaded file. The bytes live on disk under UPLOAD_DIR; this
- * record ties them to an organization so downloads can be access-controlled.
+ * Metadata for an uploaded file. The bytes live on Cloudinary (`url` +
+ * `publicId`); `key` is legacy-only, for a record uploaded before Cloudinary
+ * was wired in, when the bytes still live on local disk under UPLOAD_DIR.
  */
 const storedFileSchema = new Schema(
   {
     organizationId: { type: Schema.Types.ObjectId, ref: "Organization", required: true, index: true },
-    key: { type: String, required: true, unique: true }, // filename on disk
+    key: { type: String, unique: true, sparse: true }, // legacy: filename on local disk
+    url: { type: String, trim: true }, // Cloudinary secure_url
+    publicId: { type: String, trim: true }, // Cloudinary public_id, for deletion
+    resourceType: { type: String, trim: true, default: "raw" }, // image | raw | video
     originalName: { type: String, trim: true },
     mimeType: { type: String, trim: true },
     size: { type: Number },

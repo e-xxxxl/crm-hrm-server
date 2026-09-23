@@ -31,6 +31,7 @@ router.get(
   validate(monthlyQuerySchema, "query"),
   ctrl.monthly,
 );
+router.get("/reports/punctuality", checkPermission("attendance:read"), ctrl.punctuality);
 router.post("/manual", checkPermission("attendance:manage"), validate(manualEntrySchema), ctrl.manualEntry);
 
 export default router;

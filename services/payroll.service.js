@@ -154,7 +154,7 @@ export async function calculateRun(orgId, id, actor, { excludeEmployees = [] } =
   await Payslip.deleteMany({ organizationId: orgId, payrollRun: id });
 
   const totals = {
-    grossEarnings: 0, commission: 0, paye: 0, pensionEmployee: 0, pensionEmployer: 0,
+    grossEarnings: 0, commission: 0, paye: 0, payeEmployer: 0, pensionEmployee: 0, pensionEmployer: 0,
     nhf: 0, otherDeductions: 0, totalDeductions: 0, netPay: 0, employeeCount: 0,
   };
   const docs = [];
@@ -216,6 +216,7 @@ export async function calculateRun(orgId, id, actor, { excludeEmployees = [] } =
       commission: calc.commission,
       deductions: calc.deductions,
       paye: calc.paye,
+      payeEmployer: calc.payeEmployer,
       pensionEmployee: calc.pensionEmployee,
       pensionEmployer: calc.pensionEmployer,
       nhf: calc.nhf,
@@ -228,6 +229,7 @@ export async function calculateRun(orgId, id, actor, { excludeEmployees = [] } =
     totals.grossEarnings += calc.grossEarnings;
     totals.commission += calc.commission;
     totals.paye += calc.paye;
+    totals.payeEmployer += calc.payeEmployer;
     totals.pensionEmployee += calc.pensionEmployee;
     totals.pensionEmployer += calc.pensionEmployer;
     totals.nhf += calc.nhf;

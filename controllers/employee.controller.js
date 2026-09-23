@@ -53,6 +53,19 @@ export const provisionLogin = catchAsync(async (req, res) => {
   res.status(201).json({ data: { userId: user._id, email: user.email }, meta: { tempPassword } });
 });
 
+export const remove = catchAsync(async (req, res) => {
+  const employee = await service.getEmployee(req.orgId, req.params.id);
+  const result = await service.deleteEmployee(req.orgId, req.params.id, req.auth.permissions);
+  await recordAudit(req, {
+    action: "employee.delete",
+    entityType: "Employee",
+    entityId: req.params.id,
+    entityLabel: employee.fullName,
+    summary: `Deleted employee ${result.name} (${result.employeeId}) and all associated records`,
+  });
+  res.json({ data: result });
+});
+
 export const setStatus = catchAsync(async (req, res) => {
   const employee = await service.setEmployeeStatus(
     req.orgId,
@@ -74,4 +87,4 @@ export const setStatus = catchAsync(async (req, res) => {
   res.json({ data: employee });
 });
 
-export default { list, get, create, update, provisionLogin, setStatus };
+export default { list, get, create, update, provisionLogin, setStatus, remove };

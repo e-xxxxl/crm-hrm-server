@@ -22,6 +22,17 @@ export const create = catchAsync(async (req, res) => {
   });
   res.status(201).json({ data: doc });
 });
+export const createOwn = catchAsync(async (req, res) => {
+  const doc = await service.createOwnDocument(req.orgId, req.auth, req.body);
+  await recordAudit(req, {
+    action: "document.create",
+    entityType: "HrDocument",
+    entityId: doc._id,
+    entityLabel: doc.name,
+    summary: `Uploaded own document "${doc.name}"`,
+  });
+  res.status(201).json({ data: doc });
+});
 export const update = catchAsync(async (req, res) => {
   const doc = await service.updateDocument(req.orgId, req.params.id, req.body);
   await recordAudit(req, { action: "document.update", entityType: "HrDocument", entityId: doc._id, entityLabel: doc.name, summary: `Updated document "${doc.name}"` });
@@ -38,4 +49,4 @@ export const remove = catchAsync(async (req, res) => {
   res.json({ data: { ok: true } });
 });
 
-export default { summary, list, get, create, update, archive, remove };
+export default { summary, list, get, create, createOwn, update, archive, remove };

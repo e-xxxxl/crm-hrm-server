@@ -74,7 +74,7 @@ export async function login(email, password) {
 export async function selectOrg(userId, organizationId, ctx = {}) {
   const user = await User.findById(userId)
     .select("+twoFactor.secret +twoFactor.recoveryCodes +sessions")
-    .populate("memberships.organization", "name slug code type status payrollStrategy");
+    .populate("memberships.organization", "name slug code type status payrollStrategy logoUrl");
   if (!user || user.status !== "active") {
     throw AppError.unauthorized("Account not found or disabled");
   }
@@ -118,6 +118,7 @@ export async function selectOrg(userId, organizationId, ctx = {}) {
     organizationId: String(org._id),
     organizationName: org.name,
     organizationType: org.type,
+    organizationLogoUrl: org.logoUrl || null,
     organizationStrategy: org.payrollStrategy,
     permissions,
   };
@@ -143,6 +144,66 @@ export async function selectOrg(userId, organizationId, ctx = {}) {
 }
 
 /**
+ * Switch the active organization for an already-signed-in user — used by the
+ * in-app org switcher (Super Admin / Group Admin, who typically belong to
+ * every org) so they don't have to log out and back in. No 2FA re-check: the
+ * user already proved possession of their second factor for this session: it
+ * is tied to the account, not the org.
+ */
+export async function switchOrg(userId, organizationId, ctx = {}) {
+  const user = await User.findById(userId)
+    .select("+sessions")
+    .populate("memberships.organization", "name slug code type status payrollStrategy logoUrl");
+  if (!user || user.status !== "active") {
+    throw AppError.unauthorized("Account not found or disabled");
+  }
+
+  const membership = user.membershipFor(organizationId);
+  if (!membership || membership.status !== "active") {
+    throw AppError.forbidden("You do not belong to that organization");
+  }
+  const org = membership.organization;
+  if (!org || org.status !== "active") {
+    throw AppError.forbidden("That organization is not active");
+  }
+
+  const permissions = resolvePermissions(membership.role, {
+    grant: membership.permissionsGrant,
+    revoke: membership.permissionsRevoke,
+  });
+
+  const claims = {
+    userId: String(user._id),
+    name: user.name,
+    role: membership.role,
+    organizationId: String(org._id),
+    organizationName: org.name,
+    organizationType: org.type,
+    organizationLogoUrl: org.logoUrl || null,
+    organizationStrategy: org.payrollStrategy,
+    permissions,
+  };
+
+  const accessToken = signAccessToken(claims);
+  const refreshToken = signRefreshToken({ userId: claims.userId, organizationId: claims.organizationId });
+
+  const now = new Date();
+  user.sessions = (user.sessions || []).filter((s) => s.expiresAt > now);
+  user.sessions.push({
+    tokenHash: hashToken(refreshToken),
+    organization: org._id,
+    userAgent: ctx.userAgent || "",
+    ip: ctx.ip || "",
+    createdAt: now,
+    lastUsedAt: now,
+    expiresAt: new Date(now.getTime() + REFRESH_MS),
+  });
+  await user.save();
+
+  return { user, accessToken, refreshToken, claims };
+}
+
+/**
  * Rotate a refresh token. The presented token must match a live session; that
  * session is replaced with a hash of the new token (single-use rotation).
  */
@@ -158,7 +219,7 @@ export async function refresh(refreshToken, ctx = {}) {
 
   const user = await User.findById(decoded.userId)
     .select("+sessions")
-    .populate("memberships.organization", "name slug code type status payrollStrategy");
+    .populate("memberships.organization", "name slug code type status payrollStrategy logoUrl");
   if (!user || user.status !== "active") throw AppError.unauthorized("Account not found");
 
   const presentedHash = hashToken(refreshToken);
@@ -197,6 +258,7 @@ export async function refresh(refreshToken, ctx = {}) {
     organizationId: String(org._id),
     organizationName: org.name,
     organizationType: org.type,
+    organizationLogoUrl: org.logoUrl || null,
     organizationStrategy: org.payrollStrategy,
     permissions,
   };
@@ -381,6 +443,7 @@ export async function revokeSession(userId, sessionId) {
 export default {
   login,
   selectOrg,
+  switchOrg,
   refresh,
   logout,
   registerUser,

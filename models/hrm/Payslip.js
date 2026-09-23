@@ -44,6 +44,7 @@ const payslipSchema = new Schema(
 
     deductions: { type: [lineItem], default: [] },
     paye: { type: Number, default: 0 },
+    payeEmployer: { type: Number, default: 0 }, // company-absorbed half, not withheld
     pensionEmployee: { type: Number, default: 0 },
     pensionEmployer: { type: Number, default: 0 },
     nhf: { type: Number, default: 0 },

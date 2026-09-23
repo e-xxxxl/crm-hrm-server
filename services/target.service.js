@@ -98,6 +98,13 @@ export async function addProgress(orgId, actor, id, { value, note }) {
   if (!target) throw AppError.notFound("Target not found");
   if (["cancelled"].includes(target.status)) throw AppError.badRequest("This target is cancelled");
 
+  if (!hasPermission(actor.permissions, "target:write")) {
+    const me = await Employee.findOne({ organizationId: orgId, user: actor.userId }).select("_id");
+    if (!me || String(target.employee) !== String(me._id)) {
+      throw AppError.forbidden("You can only update progress on your own targets");
+    }
+  }
+
   target.currentValue = value;
   target.progressUpdates.push({ value, note, by: actor.userId, byName: actor.name, at: new Date() });
   target.refreshStatus();

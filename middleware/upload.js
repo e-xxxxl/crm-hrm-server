@@ -1,12 +1,11 @@
-import fs from "node:fs";
 import path from "node:path";
-import crypto from "node:crypto";
 import multer from "multer";
 import { env } from "../config/env.js";
 import { AppError } from "../utils/AppError.js";
 
-const UPLOAD_ROOT = path.resolve(env.uploadDir);
-fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
+// Legacy: where files were written before Cloudinary was wired in. Only read
+// from now, for records uploaded before this migration.
+export const UPLOAD_DIR = path.resolve(env.uploadDir);
 
 const ALLOWED = new Map([
   ["application/pdf", ".pdf"],
@@ -21,13 +20,7 @@ const ALLOWED = new Map([
   ["text/plain", ".txt"],
 ]);
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOAD_ROOT),
-  filename: (_req, file, cb) => {
-    const ext = ALLOWED.get(file.mimetype) || path.extname(file.originalname) || "";
-    cb(null, `${Date.now()}-${crypto.randomBytes(8).toString("hex")}${ext}`);
-  },
-});
+export const EXT_FOR_MIME = ALLOWED;
 
 function fileFilter(_req, file, cb) {
   if (!ALLOWED.has(file.mimetype)) {
@@ -36,16 +29,19 @@ function fileFilter(_req, file, cb) {
   cb(null, true);
 }
 
-export const uploadSingle = multer({
-  storage,
+// In-memory buffer — the file is streamed straight to Cloudinary (see
+// services/file.service.js) rather than touching local disk, which is
+// ephemeral on most hosts and never survives a redeploy.
+const uploadSingle = multer({
+  storage: multer.memoryStorage(),
   fileFilter,
   limits: { fileSize: env.maxUploadBytes, files: 1 },
 }).single("file");
 
 /**
  * Magic-byte signatures for the binary types we accept. A file whose declared
- * mimetype doesn't match its actual content is rejected and deleted — this stops
- * an attacker renaming an executable to `.pdf`.
+ * mimetype doesn't match its actual content is rejected — this stops an
+ * attacker renaming an executable to `.pdf`.
  */
 const SIGNATURES = {
   "application/pdf": [[0x25, 0x50, 0x44, 0x46]],
@@ -66,17 +62,8 @@ function contentMatchesType(buf, mimetype) {
 
 function verifyMagicBytes(req, next) {
   if (!req.file) return next();
-  try {
-    const fd = fs.openSync(req.file.path, "r");
-    const buf = Buffer.alloc(16);
-    fs.readSync(fd, buf, 0, 16, 0);
-    fs.closeSync(fd);
-    if (!contentMatchesType(buf, req.file.mimetype)) {
-      fs.unlink(req.file.path, () => {});
-      return next(AppError.badRequest("File content does not match its declared type", { code: "BAD_FILE_CONTENT" }));
-    }
-  } catch {
-    /* couldn't read it back — treat as a disk issue, not an attack */
+  if (!contentMatchesType(req.file.buffer, req.file.mimetype)) {
+    return next(AppError.badRequest("File content does not match its declared type", { code: "BAD_FILE_CONTENT" }));
   }
   next();
 }
@@ -97,5 +84,4 @@ export function upload(req, res, next) {
   });
 }
 
-export const UPLOAD_DIR = UPLOAD_ROOT;
 export default upload;

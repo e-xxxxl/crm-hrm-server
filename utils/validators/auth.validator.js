@@ -16,6 +16,10 @@ export const selectOrgSchema = z.object({
   totp: z.string().min(6).max(20).optional(),
 });
 
+export const switchOrgSchema = z.object({
+  organizationId: z.string().min(1, "organizationId is required"),
+});
+
 export const registerSchema = z.object({
   name: z.string().min(2, "Name is required").max(120),
   email: z.string().email("Enter a valid email").transform((s) => s.toLowerCase().trim()),
@@ -35,4 +39,4 @@ export const changePasswordSchema = z
     path: ["newPassword"],
   });
 
-export default { loginSchema, selectOrgSchema, registerSchema, changePasswordSchema };
+export default { loginSchema, selectOrgSchema, switchOrgSchema, registerSchema, changePasswordSchema };

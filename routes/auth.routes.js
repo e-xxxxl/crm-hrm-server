@@ -9,6 +9,7 @@ import { env } from "../config/env.js";
 import {
   loginSchema,
   selectOrgSchema,
+  switchOrgSchema,
   registerSchema,
   changePasswordSchema,
 } from "../utils/validators/auth.validator.js";
@@ -41,6 +42,7 @@ router.post("/refresh", refreshLimiter, ctrl.refresh);
 router.post("/logout", ctrl.logout);
 
 router.get("/me", verifyToken, ctrl.me);
+router.post("/switch-org", verifyToken, credentialLimiter, validate(switchOrgSchema), ctrl.switchOrg);
 router.post(
   "/change-password",
   verifyToken,

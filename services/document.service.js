@@ -51,6 +51,27 @@ export async function createDocument(orgId, actor, input) {
   return doc;
 }
 
+/**
+ * Self-service upload for an employee without `document:write` — the
+ * `employee` link is always forced to the caller's own record, never taken
+ * from the request body, so they can't file a document against anyone else.
+ */
+export async function createOwnDocument(orgId, actor, input) {
+  const employee = await Employee.findOne({ organizationId: orgId, user: actor.userId });
+  if (!employee) {
+    throw AppError.badRequest("Your account is not linked to an employee record in this organization");
+  }
+  const doc = new HrDocument({
+    ...input,
+    employee: employee._id,
+    organizationId: orgId,
+    uploadedBy: actor.userId,
+  });
+  doc.refreshStatus();
+  await doc.save();
+  return doc;
+}
+
 export async function updateDocument(orgId, id, input) {
   const doc = await HrDocument.findOne({ _id: id, organizationId: orgId });
   if (!doc) throw AppError.notFound("Document not found");
@@ -127,6 +148,7 @@ export default {
   listDocuments,
   getDocument,
   createDocument,
+  createOwnDocument,
   updateDocument,
   archiveDocument,
   deleteDocument,

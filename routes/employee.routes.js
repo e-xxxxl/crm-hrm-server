@@ -35,5 +35,8 @@ router.patch(
   validate(employeeStatusSchema),
   ctrl.setStatus,
 );
+// Route-level check is broad; the service itself refuses anyone but a Super
+// Admin (see employee.service.js deleteEmployee).
+router.delete("/:id", checkPermission("employee:deactivate"), ctrl.remove);
 
 export default router;

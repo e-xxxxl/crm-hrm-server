@@ -46,6 +46,10 @@ export const monthly = catchAsync(async (req, res) => {
   res.json({ data: await service.monthlyReport(req.orgId, req.query) });
 });
 
+export const punctuality = catchAsync(async (req, res) => {
+  res.json({ data: await service.punctualityRanking(req.orgId, req.auth, req.query) });
+});
+
 export const manualEntry = catchAsync(async (req, res) => {
   const record = await service.manualUpsert(req.orgId, req.auth.userId, req.body);
   await recordAudit(req, {

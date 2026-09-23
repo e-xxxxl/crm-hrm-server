@@ -189,6 +189,15 @@ export async function updateEmployee(orgId, id, input, actorUserId) {
 
   await assertRefsBelongToOrg(orgId, input);
 
+  if (input.employeeId) {
+    const nextId = input.employeeId.trim().toUpperCase();
+    if (nextId !== employee.employeeId) {
+      const taken = await Employee.findOne({ organizationId: orgId, employeeId: nextId, _id: { $ne: employee._id } });
+      if (taken) throw AppError.conflict(`Employee ID "${nextId}" is already in use`);
+      employee.employeeId = nextId;
+    }
+  }
+
   const now = new Date();
 
   // Track position / department / branch transitions in the history arrays.
@@ -234,6 +243,99 @@ export async function setEmployeeStatus(orgId, id, status, reason, actorUserId) 
   return employee;
 }
 
+/**
+ * Permanently remove an employee and every record about them — attendance,
+ * leave, salary/payroll history, performance reviews, disciplinary cases,
+ * documents, trip logs, notifications — plus their platform login for this
+ * org (the whole User account too, if this was their only org). Records that
+ * merely reference the employee as *someone else's* manager/reviewer/etc are
+ * not deleted, just unlinked, so the org chart and other people's history
+ * stay intact. Irreversible — only a Super Admin may call this.
+ */
+export async function deleteEmployee(orgId, id, actorPermissions = []) {
+  if (!hasPermission(actorPermissions, "*")) {
+    throw AppError.forbidden("Only a Super Admin can delete an employee");
+  }
+  const employee = await Employee.findOne({ _id: id, organizationId: orgId });
+  if (!employee) throw AppError.notFound("Employee not found");
+
+  const [
+    { Attendance },
+    { LeaveRequest },
+    { LeaveBalance },
+    { SalaryStructure },
+    { Payslip },
+    { PerformanceReview },
+    { DisciplinaryCase },
+    { HrDocument },
+    { TripLog },
+    { Notification },
+    { Target },
+    { JobPosting },
+    { Applicant },
+  ] = await Promise.all([
+    import("../models/hrm/Attendance.js"),
+    import("../models/hrm/LeaveRequest.js"),
+    import("../models/hrm/LeaveBalance.js"),
+    import("../models/hrm/SalaryStructure.js"),
+    import("../models/hrm/Payslip.js"),
+    import("../models/hrm/PerformanceReview.js"),
+    import("../models/hrm/DisciplinaryCase.js"),
+    import("../models/hrm/HrDocument.js"),
+    import("../models/hrm/TripLog.js"),
+    import("../models/hrm/Notification.js"),
+    import("../models/hrm/Target.js"),
+    import("../models/hrm/JobPosting.js"),
+    import("../models/hrm/Applicant.js"),
+  ]);
+
+  // Records owned by / about this employee — deleted outright.
+  await Promise.all([
+    Attendance.deleteMany({ organizationId: orgId, employee: id }),
+    LeaveRequest.deleteMany({ organizationId: orgId, employee: id }),
+    LeaveBalance.deleteMany({ organizationId: orgId, employee: id }),
+    SalaryStructure.deleteMany({ organizationId: orgId, employee: id }),
+    Payslip.deleteMany({ organizationId: orgId, employee: id }),
+    PerformanceReview.deleteMany({ organizationId: orgId, employee: id }),
+    DisciplinaryCase.deleteMany({ organizationId: orgId, employee: id }),
+    HrDocument.deleteMany({ organizationId: orgId, employee: id }),
+    TripLog.deleteMany({ organizationId: orgId, employee: id }),
+    Notification.deleteMany({ organizationId: orgId, recipientEmployee: id }),
+    Target.deleteMany({ organizationId: orgId, employee: id }),
+  ]);
+
+  // Records that name this employee as someone else's manager/reviewer/etc —
+  // unlinked, not deleted.
+  await Promise.all([
+    Employee.updateMany({ organizationId: orgId, reportingManager: id }, { $unset: { reportingManager: 1 } }),
+    Department.updateMany({ organizationId: orgId, head: id }, { $unset: { head: 1 } }),
+    Branch.updateMany({ organizationId: orgId, manager: id }, { $unset: { manager: 1 } }),
+    LeaveRequest.updateMany({ organizationId: orgId, lineManager: id }, { $unset: { lineManager: 1 } }),
+    PerformanceReview.updateMany({ organizationId: orgId, reviewer: id }, { $unset: { reviewer: 1 } }),
+    DisciplinaryCase.updateMany({ organizationId: orgId, reportedBy: id }, { $unset: { reportedBy: 1 } }),
+    JobPosting.updateMany({ organizationId: orgId, hiringManager: id }, { $unset: { hiringManager: 1 } }),
+    Applicant.updateMany({ organizationId: orgId, assignedRecruiter: id }, { $unset: { assignedRecruiter: 1 } }),
+    Applicant.updateMany({ organizationId: orgId, convertedToEmployee: id }, { $unset: { convertedToEmployee: 1 } }),
+  ]);
+
+  // Platform login: drop this org's membership; if that was their only org,
+  // the account itself is deleted.
+  if (employee.user) {
+    const user = await User.findById(employee.user);
+    if (user) {
+      user.memberships = user.memberships.filter((m) => String(m.organization) !== String(orgId));
+      if (user.memberships.length === 0) {
+        await User.deleteOne({ _id: user._id });
+      } else {
+        await user.save();
+      }
+    }
+  }
+
+  await Employee.deleteOne({ _id: id, organizationId: orgId });
+  return { deleted: true, name: employee.fullName, employeeId: employee.employeeId };
+}
+
 /** Close the currently-open history entry (the one without a `to`). */
 function closeOpen(list, at) {
   const open = list.find((e) => !e.to);
@@ -246,4 +348,5 @@ export default {
   createEmployee,
   updateEmployee,
   setEmployeeStatus,
+  deleteEmployee,
 };

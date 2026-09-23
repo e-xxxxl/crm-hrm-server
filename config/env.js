@@ -68,7 +68,7 @@ export const env = {
   // Auth
   jwtAccessSecret: required("JWT_ACCESS_SECRET"),
   jwtRefreshSecret: required("JWT_REFRESH_SECRET"),
-  accessTokenTtl: optional("ACCESS_TOKEN_TTL", "15m"),
+  accessTokenTtl: optional("ACCESS_TOKEN_TTL", "2h"),
   refreshTokenTtl: optional("REFRESH_TOKEN_TTL", "7d"),
   refreshCookieName: optional("REFRESH_COOKIE_NAME", "crmhrm_rt"),
 
@@ -84,9 +84,13 @@ export const env = {
   cookieSameSite: optional("COOKIE_SAMESITE", isProd ? "none" : "lax"),
   cookieDomain: optional("COOKIE_DOMAIN", ""),
 
-  // File uploads
+  // File uploads — stored on Cloudinary (local disk doesn't survive a
+  // redeploy on most hosts), falls back to local disk only if unset.
   uploadDir: optional("UPLOAD_DIR", "uploads"),
   maxUploadBytes: int("MAX_UPLOAD_BYTES", 10 * 1024 * 1024),
+  cloudName: optional("CLOUD_NAME", ""),
+  cloudApiKey: optional("CLOUD_API_KEY", ""),
+  cloudApiSecret: optional("CLOUD_API_SECRET", ""),
 
   // Reverse geocoding for GPS attendance. When unset the API stores raw
   // coordinates and leaves the address blank rather than failing.
