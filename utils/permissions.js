@@ -402,6 +402,16 @@ export function hasPermission(permissions, required) {
   return permissions.includes(required);
 }
 
+/**
+ * The three roles explicitly trusted to edit/delete records org-wide and
+ * manage other people's logins: Super Admin, Group Admin, HR Manager.
+ * Narrower than the various `*:write` permissions (which Brand Admin also
+ * holds) — used specifically where the user asked for exactly these three.
+ */
+export function isOrgAdmin(actor) {
+  return hasPermission(actor?.permissions, "*") || ["Group Admin", "HR Manager"].includes(actor?.role);
+}
+
 export default {
   ROLES,
   roleRank,
@@ -410,4 +420,5 @@ export default {
   ROLE_PERMISSIONS,
   resolvePermissions,
   hasPermission,
+  isOrgAdmin,
 };

@@ -79,6 +79,17 @@ export const addNote = catchAsync(async (req, res) => {
   res.json({ data: record });
 });
 
+export const remove = catchAsync(async (req, res) => {
+  await service.deleteCase(req.orgId, req.params.id);
+  await recordAudit(req, {
+    action: "disciplinary.delete",
+    entityType: "DisciplinaryCase",
+    entityId: req.params.id,
+    summary: `Deleted disciplinary case ${req.params.id}`,
+  });
+  res.json({ data: { ok: true } });
+});
+
 export default {
   list,
   get,
@@ -91,4 +102,5 @@ export default {
   recordHearing,
   recordOutcome,
   addNote,
+  remove,
 };

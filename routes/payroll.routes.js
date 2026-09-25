@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as ctrl from "../controllers/payroll.controller.js";
 import { verifyToken } from "../middleware/auth.js";
 import { scopeToOrg } from "../middleware/orgScope.js";
-import { checkPermission } from "../middleware/rbac.js";
+import { checkPermission, requireRole } from "../middleware/rbac.js";
 import { validate } from "../middleware/validate.js";
 import {
   salaryStructureSchema,
@@ -25,6 +25,11 @@ router.put(
   checkPermission("payroll:configure"),
   validate(salaryStructureSchema),
   ctrl.setStructure,
+);
+router.delete(
+  "/structures/:employeeId/:structureId",
+  requireRole("Super Admin", "Group Admin", "HR Manager"),
+  ctrl.deleteStructure,
 );
 
 /* Runs */

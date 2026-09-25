@@ -16,6 +16,11 @@ export const update = catchAsync(async (req, res) => {
 export const setActive = catchAsync(async (req, res) => {
   res.json({ data: await service.setTrainingActive(req.orgId, req.params.id, req.body.active) });
 });
+export const remove = catchAsync(async (req, res) => {
+  await service.deleteTraining(req.orgId, req.params.id);
+  await recordAudit(req, { action: "training.delete", entityType: "Training", entityId: req.params.id, summary: "Deleted a training" });
+  res.json({ data: { ok: true } });
+});
 
 export const listAttendance = catchAsync(async (req, res) => {
   res.json({ data: await service.listAttendance(req.orgId, req.query) });
@@ -34,4 +39,4 @@ export const deleteAttendance = catchAsync(async (req, res) => {
   res.json({ data: { ok: true } });
 });
 
-export default { list, create, update, setActive, listAttendance, listOwnAttendance, recordAttendance, deleteAttendance };
+export default { list, create, update, setActive, remove, listAttendance, listOwnAttendance, recordAttendance, deleteAttendance };

@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as ctrl from "../controllers/branch.controller.js";
 import { verifyToken } from "../middleware/auth.js";
 import { scopeToOrg } from "../middleware/orgScope.js";
-import { checkPermission } from "../middleware/rbac.js";
+import { checkPermission, requireRole } from "../middleware/rbac.js";
 import { validate } from "../middleware/validate.js";
 import {
   createBranchSchema,
@@ -18,5 +18,6 @@ router.get("/:id", checkPermission("branch:read"), ctrl.get);
 router.post("/", checkPermission("branch:write"), validate(createBranchSchema), ctrl.create);
 router.patch("/:id", checkPermission("branch:write"), validate(updateBranchSchema), ctrl.update);
 router.patch("/:id/status", checkPermission("branch:write"), validate(branchStatusSchema), ctrl.setStatus);
+router.delete("/:id", requireRole("Super Admin", "Group Admin", "HR Manager"), ctrl.remove);
 
 export default router;

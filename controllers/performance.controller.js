@@ -18,6 +18,11 @@ export const createKpi = catchAsync(async (req, res) => {
 export const updateKpi = catchAsync(async (req, res) => {
   res.json({ data: await service.updateKpi(req.orgId, req.params.id, req.body) });
 });
+export const deleteKpi = catchAsync(async (req, res) => {
+  await service.deleteKpi(req.orgId, req.params.id);
+  await recordAudit(req, { action: "kpi.delete", entityType: "Kpi", entityId: req.params.id, summary: "Deleted a KPI" });
+  res.json({ data: { ok: true } });
+});
 
 export const listReviews = catchAsync(async (req, res) => {
   res.json(await service.listReviews(req.orgId, req.auth, req.query));
@@ -67,14 +72,22 @@ export const transitionReview = catchAsync(async (req, res) => {
   res.json({ data: review });
 });
 
+export const deleteReview = catchAsync(async (req, res) => {
+  await service.deleteReview(req.orgId, req.params.id);
+  await recordAudit(req, { action: "performance.delete", entityType: "PerformanceReview", entityId: req.params.id, summary: "Deleted a performance review" });
+  res.json({ data: { ok: true } });
+});
+
 export default {
   dashboard,
   listKpis,
   createKpi,
   updateKpi,
+  deleteKpi,
   listReviews,
   getReview,
   createReview,
   updateReview,
   transitionReview,
+  deleteReview,
 };

@@ -73,6 +73,17 @@ export function calculatePayslip({
 
   const taxableGross = roundMoney(grossEarnings - unpaidLeaveDeduction);
 
+  // PAYE is charged only on basic + housing + transport, not the whole
+  // gross — subsidy, data allowance, ex gratia, referral bonus, custom
+  // earnings and trip commission are all excluded. Pro-rated for unpaid
+  // leave using the same ratio applied to the overall gross above. For a
+  // fixed-monthly structure there's no basic/housing/transport breakdown
+  // (it's one lump sum), so the whole taxable gross is used as before.
+  const payeBase =
+    strategy === "fixed-monthly"
+      ? taxableGross
+      : roundMoney((basic + housing + transport) * (grossEarnings > 0 ? taxableGross / grossEarnings : 1));
+
   // Pension (employee 8%, employer 10%) on the pensionable base.
   let pension = { employee: 0, employer: 0, pensionableBase: 0 };
   if (structure.pensionApplicable) {
@@ -95,7 +106,7 @@ export function calculatePayslip({
   let paye = 0;
   let payeEmployer = 0;
   if (structure.payeApplicable) {
-    taxDetail = computePAYE(taxableGross * 12, {
+    taxDetail = computePAYE(payeBase * 12, {
       pensionAnnual: pension.employee * 12,
       nhfAnnual: nhf * 12,
     });

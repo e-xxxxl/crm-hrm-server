@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as ctrl from "../controllers/disciplinary.controller.js";
 import { verifyToken } from "../middleware/auth.js";
 import { scopeToOrg } from "../middleware/orgScope.js";
-import { checkPermission } from "../middleware/rbac.js";
+import { checkPermission, requireRole } from "../middleware/rbac.js";
 import { validate } from "../middleware/validate.js";
 import {
   createCaseSchema,
@@ -32,5 +32,6 @@ router.post("/:id/hearing", write, validate(hearingSchema), ctrl.scheduleHearing
 router.post("/:id/hearing/record", write, validate(hearingRecordSchema), ctrl.recordHearing);
 router.post("/:id/outcome", write, validate(outcomeSchema), ctrl.recordOutcome);
 router.post("/:id/note", write, validate(noteSchema), ctrl.addNote);
+router.delete("/:id", requireRole("Super Admin", "Group Admin", "HR Manager"), ctrl.remove);
 
 export default router;

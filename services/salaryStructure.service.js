@@ -72,4 +72,28 @@ export async function setStructure(orgId, employeeId, input, actorUserId) {
   return structure;
 }
 
-export default { getCurrent, history, setStructure };
+/**
+ * Delete one salary structure record from an employee's history. Payslips are
+ * self-contained snapshots (they don't reference the structure live), so this
+ * is always safe — it never touches past pay already run. If the deleted
+ * record was the *current* structure, the employee simply has none until a
+ * new one is set (payroll already handles that: they're excluded from runs
+ * until then).
+ */
+export async function deleteStructure(orgId, employeeId, structureId) {
+  const employee = await assertEmployee(orgId, employeeId);
+  const structure = await SalaryStructure.findOne({ _id: structureId, organizationId: orgId, employee: employeeId });
+  if (!structure) throw AppError.notFound("Salary structure not found");
+
+  await structure.deleteOne();
+
+  if (String(employee.salaryStructure) === String(structureId)) {
+    employee.salaryStructure = undefined;
+    const open = (employee.salaryHistory || []).find((h) => !h.to);
+    if (open) open.to = new Date();
+    await employee.save();
+  }
+  return { ok: true };
+}
+
+export default { getCurrent, history, setStructure, deleteStructure };

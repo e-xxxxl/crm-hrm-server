@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as ctrl from "../controllers/department.controller.js";
 import { verifyToken } from "../middleware/auth.js";
 import { scopeToOrg } from "../middleware/orgScope.js";
-import { checkPermission } from "../middleware/rbac.js";
+import { checkPermission, requireRole } from "../middleware/rbac.js";
 import { validate } from "../middleware/validate.js";
 import {
   createDepartmentSchema,
@@ -23,5 +23,6 @@ router.patch(
   validate(departmentStatusSchema),
   ctrl.setStatus,
 );
+router.delete("/:id", requireRole("Super Admin", "Group Admin", "HR Manager"), ctrl.remove);
 
 export default router;

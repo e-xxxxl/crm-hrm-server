@@ -31,6 +31,21 @@ export async function updateKpi(orgId, id, input) {
   return kpi;
 }
 
+/** Hard-delete a KPI. Blocked if any target or review references it, to protect history. */
+export async function deleteKpi(orgId, id) {
+  const [{ Target }] = await Promise.all([import("../models/hrm/Target.js")]);
+  const [usedByTarget, usedByReview] = await Promise.all([
+    Target.countDocuments({ organizationId: orgId, kpi: id }),
+    PerformanceReview.countDocuments({ organizationId: orgId, "kpis.kpi": id }),
+  ]);
+  if (usedByTarget > 0 || usedByReview > 0) {
+    throw AppError.badRequest("Cannot delete — this KPI is used by an existing target or review. Deactivate it instead.");
+  }
+  const kpi = await Kpi.findOneAndDelete({ _id: id, organizationId: orgId });
+  if (!kpi) throw AppError.notFound("KPI not found");
+  return { ok: true };
+}
+
 /* --------------------------------- Reviews -------------------------------- */
 
 async function resolveActorEmployee(orgId, userId) {
@@ -229,14 +244,23 @@ export async function dashboard(orgId, query = {}) {
   };
 }
 
+/** Hard-delete a performance review. */
+export async function deleteReview(orgId, id) {
+  const review = await PerformanceReview.findOneAndDelete({ _id: id, organizationId: orgId });
+  if (!review) throw AppError.notFound("Review not found");
+  return { ok: true };
+}
+
 export default {
   listKpis,
   createKpi,
   updateKpi,
+  deleteKpi,
   listReviews,
   getReview,
   createReview,
   updateReview,
   transitionReview,
+  deleteReview,
   dashboard,
 };

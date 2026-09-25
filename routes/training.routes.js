@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as ctrl from "../controllers/training.controller.js";
 import { verifyToken } from "../middleware/auth.js";
 import { scopeToOrg } from "../middleware/orgScope.js";
-import { checkPermission } from "../middleware/rbac.js";
+import { checkPermission, requireRole } from "../middleware/rbac.js";
 import { validate } from "../middleware/validate.js";
 import {
   createTrainingSchema,
@@ -14,12 +14,14 @@ import {
 const router = Router();
 router.use(verifyToken, scopeToOrg);
 
-// Catalog — creating/editing trainings is Super Admin / Group Admin only
-// (training:write); everyone with training:read can browse it.
+// Catalog — creating a new training is Super Admin / Group Admin only, as
+// requested; editing/deactivating/deleting an existing one is also open to
+// HR Manager. Everyone with training:read can browse the catalog.
 router.get("/", checkPermission("training:read"), ctrl.list);
 router.post("/", checkPermission("training:write"), validate(createTrainingSchema), ctrl.create);
-router.patch("/:id", checkPermission("training:write"), validate(updateTrainingSchema), ctrl.update);
-router.patch("/:id/active", checkPermission("training:write"), validate(trainingActiveSchema), ctrl.setActive);
+router.patch("/:id", requireRole("Super Admin", "Group Admin", "HR Manager"), validate(updateTrainingSchema), ctrl.update);
+router.patch("/:id/active", requireRole("Super Admin", "Group Admin", "HR Manager"), validate(trainingActiveSchema), ctrl.setActive);
+router.delete("/:id", requireRole("Super Admin", "Group Admin", "HR Manager"), ctrl.remove);
 
 // Attendance — anyone who can view an employee's profile can see their
 // training history; recording/removing it needs the same tier that already

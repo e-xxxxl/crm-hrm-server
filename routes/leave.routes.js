@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as ctrl from "../controllers/leave.controller.js";
 import { verifyToken } from "../middleware/auth.js";
 import { scopeToOrg } from "../middleware/orgScope.js";
-import { checkPermission } from "../middleware/rbac.js";
+import { checkPermission, requireRole } from "../middleware/rbac.js";
 import { validate } from "../middleware/validate.js";
 import {
   createLeaveTypeSchema,
@@ -26,6 +26,7 @@ router.get("/types/:id", checkPermission("leave:read"), ctrl.getType);
 router.post("/types", checkPermission("leave:configure"), validate(createLeaveTypeSchema), ctrl.createType);
 router.patch("/types/:id", checkPermission("leave:configure"), validate(updateLeaveTypeSchema), ctrl.updateType);
 router.patch("/types/:id/active", checkPermission("leave:configure"), validate(leaveTypeActiveSchema), ctrl.setTypeActive);
+router.delete("/types/:id", requireRole("Super Admin", "Group Admin", "HR Manager"), ctrl.deleteType);
 
 /* ---- Balances ---- */
 router.get("/me", checkPermission("leave:read"), ctrl.myLeave);

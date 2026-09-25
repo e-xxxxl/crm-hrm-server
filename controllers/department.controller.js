@@ -46,4 +46,17 @@ export const setStatus = catchAsync(async (req, res) => {
   res.json({ data: department });
 });
 
-export default { list, get, create, update, setStatus };
+export const remove = catchAsync(async (req, res) => {
+  const department = await service.getDepartment(req.orgId, req.params.id);
+  await service.deleteDepartment(req.orgId, req.params.id);
+  await recordAudit(req, {
+    action: "department.delete",
+    entityType: "Department",
+    entityId: req.params.id,
+    entityLabel: department.department.name,
+    summary: `Deleted department ${department.department.name}`,
+  });
+  res.json({ data: { ok: true } });
+});
+
+export default { list, get, create, update, setStatus, remove };

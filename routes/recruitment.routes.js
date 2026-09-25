@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as ctrl from "../controllers/recruitment.controller.js";
 import { verifyToken } from "../middleware/auth.js";
 import { scopeToOrg } from "../middleware/orgScope.js";
-import { checkPermission } from "../middleware/rbac.js";
+import { checkPermission, requireRole } from "../middleware/rbac.js";
 import { validate } from "../middleware/validate.js";
 import {
   createJobSchema,
@@ -29,6 +29,7 @@ router.get("/jobs", read, ctrl.listJobs);
 router.get("/jobs/:id", read, ctrl.getJob);
 router.post("/jobs", write, validate(createJobSchema), ctrl.createJob);
 router.patch("/jobs/:id", write, validate(updateJobSchema), ctrl.updateJob);
+router.delete("/jobs/:id", requireRole("Super Admin", "Group Admin", "HR Manager"), ctrl.deleteJob);
 router.get("/jobs/:jobId/pipeline", read, ctrl.pipeline);
 
 router.get("/applicants", read, ctrl.listApplicants);
@@ -40,5 +41,6 @@ router.post("/applicants/:id/interviews", write, validate(interviewSchema), ctrl
 router.post("/applicants/:id/interviews/:index/feedback", write, validate(interviewFeedbackSchema), ctrl.interviewFeedback);
 router.post("/applicants/:id/note", read, validate(noteSchema), ctrl.addApplicantNote);
 router.post("/applicants/:id/convert", checkPermission(["recruitment:write", "employee:write"]), validate(convertApplicantSchema), ctrl.convert);
+router.delete("/applicants/:id", requireRole("Super Admin", "Group Admin", "HR Manager"), ctrl.deleteApplicant);
 
 export default router;

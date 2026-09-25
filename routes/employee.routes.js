@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as ctrl from "../controllers/employee.controller.js";
 import { verifyToken } from "../middleware/auth.js";
 import { scopeToOrg } from "../middleware/orgScope.js";
-import { checkPermission } from "../middleware/rbac.js";
+import { checkPermission, requireRole } from "../middleware/rbac.js";
 import { validate } from "../middleware/validate.js";
 import { z } from "zod";
 import {
@@ -15,6 +15,19 @@ const provisionLoginSchema = z.object({
   role: z.string().min(1),
   password: z.string().min(8).max(128).optional(),
 });
+
+const updateLoginSchema = z.object({
+  email: z.string().email().optional(),
+  role: z.string().min(1).optional(),
+  status: z.enum(["active", "suspended"]).optional(),
+});
+
+const resetPasswordSchema = z.object({
+  password: z.string().min(8).max(128).optional(),
+});
+
+// Login view/edit/reset is restricted to exactly these three roles.
+const ADMIN_ROLES = ["Super Admin", "Group Admin", "HR Manager"];
 
 const router = Router();
 router.use(verifyToken, scopeToOrg);
@@ -35,8 +48,19 @@ router.patch(
   validate(employeeStatusSchema),
   ctrl.setStatus,
 );
-// Route-level check is broad; the service itself refuses anyone but a Super
-// Admin (see employee.service.js deleteEmployee).
-router.delete("/:id", checkPermission("employee:deactivate"), ctrl.remove);
+// Delete cascades through every record about the employee — restricted to
+// Super Admin, Group Admin, and HR Manager (see employee.service.js
+// deleteEmployee, which double-checks this).
+router.delete("/:id", requireRole(...ADMIN_ROLES), ctrl.remove);
+
+// View/edit/reset an employee's platform login — same three roles.
+router.get("/:id/login", requireRole(...ADMIN_ROLES), ctrl.getLogin);
+router.patch("/:id/login", requireRole(...ADMIN_ROLES), validate(updateLoginSchema), ctrl.updateLogin);
+router.post(
+  "/:id/login/reset-password",
+  requireRole(...ADMIN_ROLES),
+  validate(resetPasswordSchema),
+  ctrl.resetLoginPassword,
+);
 
 export default router;

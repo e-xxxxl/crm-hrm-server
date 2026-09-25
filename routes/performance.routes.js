@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as ctrl from "../controllers/performance.controller.js";
 import { verifyToken } from "../middleware/auth.js";
 import { scopeToOrg } from "../middleware/orgScope.js";
-import { checkPermission } from "../middleware/rbac.js";
+import { checkPermission, requireRole } from "../middleware/rbac.js";
 import { validate } from "../middleware/validate.js";
 import {
   kpiSchema,
@@ -19,11 +19,13 @@ router.get("/dashboard", checkPermission("performance:read"), ctrl.dashboard);
 router.get("/kpis", checkPermission("performance:read"), ctrl.listKpis);
 router.post("/kpis", checkPermission("performance:write"), validate(kpiSchema), ctrl.createKpi);
 router.patch("/kpis/:id", checkPermission("performance:write"), validate(kpiSchema.partial()), ctrl.updateKpi);
+router.delete("/kpis/:id", requireRole("Super Admin", "Group Admin", "HR Manager"), ctrl.deleteKpi);
 
 router.get("/reviews", checkPermission("performance:read"), ctrl.listReviews);
 router.get("/reviews/:id", checkPermission("performance:read"), ctrl.getReview);
 router.post("/reviews", checkPermission("performance:write"), validate(createReviewSchema), ctrl.createReview);
 router.patch("/reviews/:id", checkPermission("performance:read"), validate(updateReviewSchema), ctrl.updateReview);
 router.post("/reviews/:id/transition", checkPermission("performance:read"), validate(reviewActionSchema), ctrl.transitionReview);
+router.delete("/reviews/:id", requireRole("Super Admin", "Group Admin", "HR Manager"), ctrl.deleteReview);
 
 export default router;

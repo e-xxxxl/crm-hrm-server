@@ -86,10 +86,22 @@ export async function setDepartmentStatus(orgId, id, status) {
   return department;
 }
 
+export async function deleteDepartment(orgId, id) {
+  const staff = await Employee.countDocuments({ organizationId: orgId, department: id });
+  if (staff > 0) {
+    throw AppError.badRequest(`Cannot delete — ${staff} employee(s) are assigned to this department (past or present)`);
+  }
+  const department = await Department.findOneAndDelete({ _id: id, organizationId: orgId });
+  if (!department) throw AppError.notFound("Department not found");
+  await Department.updateMany({ organizationId: orgId, parent: id }, { $unset: { parent: 1 } });
+  return { ok: true };
+}
+
 export default {
   listDepartments,
   getDepartment,
   createDepartment,
   updateDepartment,
   setDepartmentStatus,
+  deleteDepartment,
 };

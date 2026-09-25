@@ -160,6 +160,18 @@ export async function addNote(orgId, actor, id, note) {
   return record;
 }
 
+/**
+ * Hard-delete a disciplinary case. Note: most HR compliance regimes expect
+ * disciplinary records to be retained, not deleted — this exists because it
+ * was explicitly requested, but consider archiving/closing a case instead of
+ * deleting it where record-keeping requirements apply.
+ */
+export async function deleteCase(orgId, id) {
+  const c = await DisciplinaryCase.findOneAndDelete({ _id: id, organizationId: orgId });
+  if (!c) throw AppError.notFound("Case not found");
+  return { ok: true };
+}
+
 export default {
   listCases,
   getCase,
@@ -172,4 +184,5 @@ export default {
   recordHearing,
   recordOutcome,
   addNote,
+  deleteCase,
 };

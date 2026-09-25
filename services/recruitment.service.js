@@ -259,17 +259,41 @@ export async function recruitmentSummary(orgId) {
   };
 }
 
+/** Delete a job posting. Blocked if it has any applicants, to protect their history. */
+export async function deleteJob(orgId, id) {
+  const applicants = await Applicant.countDocuments({ organizationId: orgId, jobPosting: id });
+  if (applicants > 0) {
+    throw AppError.badRequest(`Cannot delete — ${applicants} applicant(s) are attached to this posting. Close or cancel it instead.`);
+  }
+  const job = await JobPosting.findOneAndDelete({ _id: id, organizationId: orgId });
+  if (!job) throw AppError.notFound("Job posting not found");
+  return { ok: true };
+}
+
+/** Delete an applicant. Blocked once converted to an employee, to protect that record's origin link. */
+export async function deleteApplicant(orgId, id) {
+  const applicant = await Applicant.findOne({ _id: id, organizationId: orgId });
+  if (!applicant) throw AppError.notFound("Applicant not found");
+  if (applicant.convertedToEmployee) {
+    throw AppError.badRequest("This applicant was already converted to an employee and can no longer be deleted.");
+  }
+  await applicant.deleteOne();
+  return { ok: true };
+}
+
 export default {
   listJobs,
   getJob,
   createJob,
   updateJob,
+  deleteJob,
   pipeline,
   listApplicants,
   getApplicant,
   addApplicant,
   moveStage,
   updateApplicant,
+  deleteApplicant,
   scheduleInterview,
   recordInterviewFeedback,
   addApplicantNote,

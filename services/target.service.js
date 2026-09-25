@@ -130,4 +130,10 @@ export async function summary(orgId) {
   return { counts, total: rows.reduce((s, r) => s + r.n, 0), dueSoon };
 }
 
-export default { listTargets, getTarget, createTarget, updateTarget, addProgress, summary };
+export async function deleteTarget(orgId, id) {
+  const target = await Target.findOneAndDelete({ _id: id, organizationId: orgId });
+  if (!target) throw AppError.notFound("Target not found");
+  return { ok: true };
+}
+
+export default { listTargets, getTarget, createTarget, updateTarget, addProgress, deleteTarget, summary };

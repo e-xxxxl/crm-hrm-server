@@ -24,6 +24,11 @@ export const updateJob = catchAsync(async (req, res) => {
   await recordAudit(req, { action: "job.update", entityType: "JobPosting", entityId: job._id, entityLabel: job.reference, summary: `Updated job posting "${job.title}" (${job.status})` });
   res.json({ data: job });
 });
+export const deleteJob = catchAsync(async (req, res) => {
+  await service.deleteJob(req.orgId, req.params.id);
+  await recordAudit(req, { action: "job.delete", entityType: "JobPosting", entityId: req.params.id, summary: "Deleted a job posting" });
+  res.json({ data: { ok: true } });
+});
 
 /* Applicants */
 export const pipeline = catchAsync(async (req, res) => {
@@ -71,18 +76,26 @@ export const convert = catchAsync(async (req, res) => {
   res.status(201).json({ data: employee });
 });
 
+export const deleteApplicant = catchAsync(async (req, res) => {
+  await service.deleteApplicant(req.orgId, req.params.id);
+  await recordAudit(req, { action: "applicant.delete", entityType: "Applicant", entityId: req.params.id, summary: "Deleted an applicant" });
+  res.json({ data: { ok: true } });
+});
+
 export default {
   summary,
   listJobs,
   getJob,
   createJob,
   updateJob,
+  deleteJob,
   pipeline,
   listApplicants,
   getApplicant,
   addApplicant,
   moveStage,
   updateApplicant,
+  deleteApplicant,
   scheduleInterview,
   interviewFeedback,
   addApplicantNote,

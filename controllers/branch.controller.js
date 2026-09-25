@@ -46,4 +46,17 @@ export const setStatus = catchAsync(async (req, res) => {
   res.json({ data: branch });
 });
 
-export default { list, get, create, update, setStatus };
+export const remove = catchAsync(async (req, res) => {
+  const { branch } = await service.getBranch(req.orgId, req.params.id);
+  await service.deleteBranch(req.orgId, req.params.id);
+  await recordAudit(req, {
+    action: "branch.delete",
+    entityType: "Branch",
+    entityId: req.params.id,
+    entityLabel: branch.name,
+    summary: `Deleted branch ${branch.name}`,
+  });
+  res.json({ data: { ok: true } });
+});
+
+export default { list, get, create, update, setStatus, remove };

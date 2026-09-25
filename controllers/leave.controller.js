@@ -28,6 +28,12 @@ export const setTypeActive = catchAsync(async (req, res) => {
   await recordAudit(req, { action: "leave_type.status", entityType: "LeaveType", entityId: t._id, entityLabel: t.name, summary: `${t.active ? "Activated" : "Deactivated"} leave type ${t.name}` });
   res.json({ data: t });
 });
+export const deleteType = catchAsync(async (req, res) => {
+  const t = await leaveTypes.getLeaveType(req.orgId, req.params.id);
+  await leaveTypes.deleteLeaveType(req.orgId, req.params.id);
+  await recordAudit(req, { action: "leave_type.delete", entityType: "LeaveType", entityId: req.params.id, entityLabel: t.name, summary: `Deleted leave type ${t.name}` });
+  res.json({ data: { ok: true } });
+});
 
 /* -------- Balances -------- */
 
@@ -156,6 +162,7 @@ export default {
   createType,
   updateType,
   setTypeActive,
+  deleteType,
   myLeave,
   employeeBalances,
   adjustBalance,

@@ -55,7 +55,7 @@ export const provisionLogin = catchAsync(async (req, res) => {
 
 export const remove = catchAsync(async (req, res) => {
   const employee = await service.getEmployee(req.orgId, req.params.id);
-  const result = await service.deleteEmployee(req.orgId, req.params.id, req.auth.permissions);
+  const result = await service.deleteEmployee(req.orgId, req.params.id, req.auth);
   await recordAudit(req, {
     action: "employee.delete",
     entityType: "Employee",
@@ -64,6 +64,37 @@ export const remove = catchAsync(async (req, res) => {
     summary: `Deleted employee ${result.name} (${result.employeeId}) and all associated records`,
   });
   res.json({ data: result });
+});
+
+export const getLogin = catchAsync(async (req, res) => {
+  const employee = await service.getEmployee(req.orgId, req.params.id);
+  res.json({ data: await service.getEmployeeLogin(req.orgId, employee) });
+});
+
+export const updateLogin = catchAsync(async (req, res) => {
+  const employee = await service.getEmployee(req.orgId, req.params.id);
+  const login = await service.updateEmployeeLogin(req.orgId, employee, req.body, req.auth.permissions);
+  await recordAudit(req, {
+    action: "employee.update_login",
+    entityType: "Employee",
+    entityId: employee._id,
+    entityLabel: employee.fullName,
+    summary: `Updated login details for ${employee.fullName}`,
+  });
+  res.json({ data: login });
+});
+
+export const resetLoginPassword = catchAsync(async (req, res) => {
+  const employee = await service.getEmployee(req.orgId, req.params.id);
+  const { tempPassword } = await service.resetEmployeeLoginPassword(req.orgId, employee, req.body.password);
+  await recordAudit(req, {
+    action: "employee.reset_login_password",
+    entityType: "Employee",
+    entityId: employee._id,
+    entityLabel: employee.fullName,
+    summary: `Reset the login password for ${employee.fullName}`,
+  });
+  res.json({ data: { tempPassword } });
 });
 
 export const setStatus = catchAsync(async (req, res) => {
@@ -87,4 +118,7 @@ export const setStatus = catchAsync(async (req, res) => {
   res.json({ data: employee });
 });
 
-export default { list, get, create, update, provisionLogin, setStatus, remove };
+export default {
+  list, get, create, update, provisionLogin, setStatus, remove,
+  getLogin, updateLogin, resetLoginPassword,
+};

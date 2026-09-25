@@ -36,6 +36,17 @@ export const setStructure = catchAsync(async (req, res) => {
   res.status(201).json({ data: structure });
 });
 
+export const deleteStructure = catchAsync(async (req, res) => {
+  await structures.deleteStructure(req.orgId, req.params.employeeId, req.params.structureId);
+  await recordAudit(req, {
+    action: "salary_structure.delete",
+    entityType: "SalaryStructure",
+    entityId: req.params.structureId,
+    summary: `Deleted a salary structure record for employee ${req.params.employeeId}`,
+  });
+  res.json({ data: { ok: true } });
+});
+
 /* -------- Payroll runs -------- */
 
 export const listRuns = catchAsync(async (req, res) => {
@@ -206,6 +217,7 @@ export const deleteTrip = catchAsync(async (req, res) => {
 export default {
   getStructure,
   setStructure,
+  deleteStructure,
   listRuns,
   getRun,
   createRun,

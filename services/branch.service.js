@@ -79,6 +79,16 @@ export async function setBranchStatus(orgId, id, status) {
   return branch;
 }
 
+export async function deleteBranch(orgId, id) {
+  const staff = await Employee.countDocuments({ organizationId: orgId, branch: id });
+  if (staff > 0) {
+    throw AppError.badRequest(`Cannot delete — ${staff} employee(s) are assigned to this branch (past or present)`);
+  }
+  const branch = await Branch.findOneAndDelete({ _id: id, organizationId: orgId });
+  if (!branch) throw AppError.notFound("Branch not found");
+  return { ok: true };
+}
+
 function stripCoords(input) {
   const { latitude, longitude, lat, lng, ...rest } = input;
   return rest;
@@ -88,4 +98,4 @@ function toObjectId(id) {
   return new mongoose.Types.ObjectId(String(id));
 }
 
-export default { listBranches, getBranch, createBranch, updateBranch, setBranchStatus };
+export default { listBranches, getBranch, createBranch, updateBranch, setBranchStatus, deleteBranch };

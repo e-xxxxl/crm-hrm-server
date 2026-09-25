@@ -33,6 +33,17 @@ export async function setTrainingActive(orgId, id, active) {
   return t;
 }
 
+/** Hard-delete a catalog training. Blocked if any attendance record references it, to protect history. */
+export async function deleteTraining(orgId, id) {
+  const used = await TrainingAttendance.countDocuments({ organizationId: orgId, training: id });
+  if (used > 0) {
+    throw AppError.badRequest(`Cannot delete — ${used} attendance record(s) reference this training. Deactivate it instead.`);
+  }
+  const t = await Training.findOneAndDelete({ _id: id, organizationId: orgId });
+  if (!t) throw AppError.notFound("Training not found");
+  return { ok: true };
+}
+
 /* ------------------------------ attendance ------------------------------ */
 
 export async function listAttendance(orgId, query = {}) {
@@ -79,6 +90,7 @@ export default {
   createTraining,
   updateTraining,
   setTrainingActive,
+  deleteTraining,
   listAttendance,
   listOwnAttendance,
   recordAttendance,

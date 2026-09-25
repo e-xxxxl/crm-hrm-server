@@ -6,7 +6,7 @@ import { Branch } from "../models/hrm/Branch.js";
 import { User } from "../models/hrm/User.js";
 import { nextCode } from "../models/hrm/Counter.js";
 import { AppError } from "../utils/AppError.js";
-import { ROLES, hasPermission } from "../utils/permissions.js";
+import { ROLES, hasPermission, isOrgAdmin } from "../utils/permissions.js";
 import { parsePagination, parseSort, paginated, escapeRegex } from "../utils/query.js";
 
 const SORTABLE = ["lastName", "firstName", "employeeId", "position", "dateJoined", "createdAt", "employmentStatus"];
@@ -170,6 +170,71 @@ export async function provisionEmployeeLogin(orgId, employee, { role, password }
   return { user, tempPassword: user.mustChangePassword ? tempPassword : null };
 }
 
+/** View an employee's login details for this org — email, role, status, last sign-in. */
+export async function getEmployeeLogin(orgId, employee) {
+  if (!employee.user) return null;
+  const user = await User.findById(employee.user);
+  if (!user) return null;
+  const membership = user.membershipFor(orgId);
+  if (!membership) return null;
+  return {
+    userId: user._id,
+    email: user.email,
+    role: membership.role,
+    status: membership.status,
+    mustChangePassword: user.mustChangePassword,
+    lastLoginAt: user.lastLoginAt,
+  };
+}
+
+/**
+ * Change an employee's login email, role, or suspended/active status for this
+ * org. Reuses the same Super-Admin-only guard as granting the role at
+ * provisioning time. Changing the login email checks it isn't already taken
+ * by a different account.
+ */
+export async function updateEmployeeLogin(orgId, employee, input, actorPermissions = []) {
+  if (!employee.user) throw AppError.badRequest("This employee has no platform login yet");
+  const user = await User.findById(employee.user);
+  if (!user) throw AppError.badRequest("This employee has no platform login yet");
+  const membership = user.membershipFor(orgId);
+  if (!membership) throw AppError.badRequest("This employee has no platform login yet");
+
+  if (input.role && input.role !== membership.role) {
+    if (!ROLES.includes(input.role)) throw AppError.badRequest(`Unknown role "${input.role}"`);
+    if (input.role === "Super Admin" && !hasPermission(actorPermissions, "*")) {
+      throw AppError.forbidden("Only a Super Admin can grant the Super Admin role");
+    }
+    membership.role = input.role;
+  }
+  if (input.status && input.status !== membership.status) {
+    membership.status = input.status;
+  }
+  if (input.email && input.email.toLowerCase() !== user.email) {
+    const taken = await User.findOne({ email: input.email.toLowerCase(), _id: { $ne: user._id } });
+    if (taken) throw AppError.conflict("That email is already in use by another account");
+    user.email = input.email.toLowerCase();
+  }
+
+  await user.save();
+  return getEmployeeLogin(orgId, employee);
+}
+
+/** Reset an employee's login password — sets a new temp password they must change on next sign-in, and revokes their existing sessions for this org. */
+export async function resetEmployeeLoginPassword(orgId, employee, password) {
+  if (!employee.user) throw AppError.badRequest("This employee has no platform login yet");
+  const user = await User.findById(employee.user).select("+passwordHash +sessions");
+  if (!user) throw AppError.badRequest("This employee has no platform login yet");
+  if (!user.membershipFor(orgId)) throw AppError.badRequest("This employee has no platform login yet");
+
+  const tempPassword = password || crypto.randomBytes(9).toString("base64url");
+  await user.setPassword(tempPassword);
+  user.mustChangePassword = true;
+  user.sessions = (user.sessions || []).filter((s) => String(s.organization) !== String(orgId));
+  await user.save();
+  return { tempPassword };
+}
+
 async function linkUser(orgId, employee, user) {
   const membership = user.membershipFor(orgId);
   if (membership && !membership.employee) {
@@ -250,11 +315,12 @@ export async function setEmployeeStatus(orgId, id, status, reason, actorUserId) 
  * org (the whole User account too, if this was their only org). Records that
  * merely reference the employee as *someone else's* manager/reviewer/etc are
  * not deleted, just unlinked, so the org chart and other people's history
- * stay intact. Irreversible — only a Super Admin may call this.
+ * stay intact. Irreversible — only Super Admin, Group Admin, or HR Manager
+ * may call this.
  */
-export async function deleteEmployee(orgId, id, actorPermissions = []) {
-  if (!hasPermission(actorPermissions, "*")) {
-    throw AppError.forbidden("Only a Super Admin can delete an employee");
+export async function deleteEmployee(orgId, id, actor) {
+  if (!isOrgAdmin(actor)) {
+    throw AppError.forbidden("Only a Super Admin, Group Admin, or HR Manager can delete an employee");
   }
   const employee = await Employee.findOne({ _id: id, organizationId: orgId });
   if (!employee) throw AppError.notFound("Employee not found");
@@ -349,4 +415,7 @@ export default {
   updateEmployee,
   setEmployeeStatus,
   deleteEmployee,
+  getEmployeeLogin,
+  updateEmployeeLogin,
+  resetEmployeeLoginPassword,
 };

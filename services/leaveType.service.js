@@ -74,6 +74,17 @@ export async function setLeaveTypeActive(orgId, id, active) {
   return t;
 }
 
+/** Hard-delete a leave type. Blocked if any request — of any status, past or present — used it, to protect history. */
+export async function deleteLeaveType(orgId, id) {
+  const used = await LeaveRequest.countDocuments({ organizationId: orgId, leaveType: id });
+  if (used > 0) {
+    throw AppError.badRequest(`Cannot delete — ${used} leave request(s) reference this type. Deactivate it instead.`);
+  }
+  const t = await LeaveType.findOneAndDelete({ _id: id, organizationId: orgId });
+  if (!t) throw AppError.notFound("Leave type not found");
+  return { ok: true };
+}
+
 export default {
   ensureDefaults,
   listLeaveTypes,
@@ -81,5 +92,6 @@ export default {
   createLeaveType,
   updateLeaveType,
   setLeaveTypeActive,
+  deleteLeaveType,
   DEFAULT_LEAVE_TYPES,
 };

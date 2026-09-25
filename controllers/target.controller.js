@@ -51,4 +51,17 @@ export const addProgress = catchAsync(async (req, res) => {
   res.json({ data: target });
 });
 
-export default { summary, list, get, create, update, addProgress };
+export const remove = catchAsync(async (req, res) => {
+  const target = await service.getTarget(req.orgId, req.params.id);
+  await service.deleteTarget(req.orgId, req.params.id);
+  await recordAudit(req, {
+    action: "target.delete",
+    entityType: "Target",
+    entityId: req.params.id,
+    entityLabel: target.title,
+    summary: `Deleted target "${target.title}"`,
+  });
+  res.json({ data: { ok: true } });
+});
+
+export default { summary, list, get, create, update, addProgress, remove };
