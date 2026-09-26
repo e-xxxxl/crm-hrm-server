@@ -3,13 +3,13 @@ import { catchAsync } from "../utils/catchAsync.js";
 import { recordAudit } from "../services/audit.service.js";
 
 export const summary = catchAsync(async (req, res) => {
-  res.json({ data: await service.expirySummary(req.orgId) });
+  res.json({ data: await service.expirySummary(req.orgId, req.auth) });
 });
 export const list = catchAsync(async (req, res) => {
-  res.json(await service.listDocuments(req.orgId, req.query));
+  res.json(await service.listDocuments(req.orgId, req.query, req.auth));
 });
 export const get = catchAsync(async (req, res) => {
-  res.json({ data: await service.getDocument(req.orgId, req.params.id) });
+  res.json({ data: await service.getDocument(req.orgId, req.params.id, req.auth) });
 });
 export const create = catchAsync(async (req, res) => {
   const doc = await service.createDocument(req.orgId, req.auth, req.body);

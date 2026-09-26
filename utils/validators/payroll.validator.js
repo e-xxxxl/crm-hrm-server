@@ -20,6 +20,7 @@ export const salaryStructureSchema = z.object({
   dataAllowance: money.optional(),
   exGratia: money.optional(),
   referralBonus: money.optional(),
+  overtime: money.optional(),
   customEarnings: z.array(customEarning).max(20).optional(),
   grossMonthly: money.optional(),
   commissionPerTrip: money.optional(),

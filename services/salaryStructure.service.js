@@ -46,6 +46,7 @@ export async function setStructure(orgId, employeeId, input, actorUserId) {
     dataAllowance: input.dataAllowance || 0,
     exGratia: input.exGratia || 0,
     referralBonus: input.referralBonus || 0,
+    overtime: input.overtime || 0,
     customEarnings: input.customEarnings || [],
     grossMonthly: input.grossMonthly || 0,
     commissionPerTrip: input.commissionPerTrip || 0,
@@ -59,7 +60,7 @@ export async function setStructure(orgId, employeeId, input, actorUserId) {
   const gross =
     structure.grossMonthly ||
     structure.basic + structure.housing + structure.transport + structure.subsidy + structure.dataAllowance +
-      structure.exGratia + structure.referralBonus +
+      structure.exGratia + structure.referralBonus + structure.overtime +
       (structure.customEarnings || []).reduce((s, c) => s + (c.amount || 0), 0);
 
   employee.salaryStructure = structure._id;

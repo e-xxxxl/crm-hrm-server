@@ -26,6 +26,7 @@ export function calculatePayslip({
   const dataAllowance = structure.dataAllowance || 0;
   const exGratia = structure.exGratia || 0;
   const referralBonus = structure.referralBonus || 0;
+  const overtime = structure.overtime || 0;
   const custom = structure.customEarnings || [];
 
   if (strategy === "fixed-monthly") {
@@ -37,6 +38,7 @@ export function calculatePayslip({
     if (transport) earnings.push({ label: "Transport allowance", amount: roundMoney(transport) });
     if (exGratia) earnings.push({ label: "Ex gratia", amount: roundMoney(exGratia) });
     if (referralBonus) earnings.push({ label: "Referral bonus", amount: roundMoney(referralBonus) });
+    if (overtime) earnings.push({ label: "Overtime", amount: roundMoney(overtime) });
     for (const c of custom) earnings.push({ label: c.name, amount: roundMoney(c.amount) });
     commission =
       tripAmountTotal != null
@@ -54,6 +56,7 @@ export function calculatePayslip({
     if (dataAllowance) earnings.push({ label: "Data allowance", amount: roundMoney(dataAllowance) });
     if (exGratia) earnings.push({ label: "Ex gratia", amount: roundMoney(exGratia) });
     if (referralBonus) earnings.push({ label: "Referral bonus", amount: roundMoney(referralBonus) });
+    if (overtime) earnings.push({ label: "Overtime", amount: roundMoney(overtime) });
     for (const c of custom) earnings.push({ label: c.name, amount: roundMoney(c.amount) });
   }
 
@@ -74,11 +77,12 @@ export function calculatePayslip({
   const taxableGross = roundMoney(grossEarnings - unpaidLeaveDeduction);
 
   // PAYE is charged only on basic + housing + transport, not the whole
-  // gross — subsidy, data allowance, ex gratia, referral bonus, custom
-  // earnings and trip commission are all excluded. Pro-rated for unpaid
-  // leave using the same ratio applied to the overall gross above. For a
-  // fixed-monthly structure there's no basic/housing/transport breakdown
-  // (it's one lump sum), so the whole taxable gross is used as before.
+  // gross — subsidy, data allowance, ex gratia, referral bonus, overtime,
+  // custom earnings and trip commission are all excluded. Pro-rated for
+  // unpaid leave using the same ratio applied to the overall gross above.
+  // For a fixed-monthly structure there's no basic/housing/transport
+  // breakdown (it's one lump sum), so the whole taxable gross is used as
+  // before.
   const payeBase =
     strategy === "fixed-monthly"
       ? taxableGross
@@ -141,7 +145,7 @@ function fixedComponentsTotal(s) {
   const custom = (s.customEarnings || []).reduce((sum, c) => sum + (c.amount || 0), 0);
   return (
     (s.basic || 0) + (s.housing || 0) + (s.transport || 0) + (s.subsidy || 0) + (s.dataAllowance || 0) +
-    (s.exGratia || 0) + (s.referralBonus || 0) + custom
+    (s.exGratia || 0) + (s.referralBonus || 0) + (s.overtime || 0) + custom
   );
 }
 

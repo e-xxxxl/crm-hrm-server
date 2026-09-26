@@ -4,10 +4,26 @@ import { Employee } from "../models/hrm/Employee.js";
 import { AppError } from "../utils/AppError.js";
 import { parsePagination, paginated, escapeRegex } from "../utils/query.js";
 import { deleteFile } from "./file.service.js";
+import { hasPermission } from "../utils/permissions.js";
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
 
-export async function listDocuments(orgId, query = {}) {
+/**
+ * `document:read` alone (held by self-service roles like Staff/Rider) only
+ * proves you may see your own file cabinet, not everyone's. Only
+ * `document:write` (admin/HR tier) or the wildcard sees the whole org.
+ * Returns the caller's own employee id, or `null` if they're privileged
+ * (no scoping needed) or have no linked employee record (scoped to nothing).
+ */
+async function ownScopeFor(orgId, actor) {
+  if (!actor || hasPermission(actor.permissions, "*") || hasPermission(actor.permissions, "document:write")) {
+    return null;
+  }
+  const employee = await Employee.findOne({ organizationId: orgId, user: actor.userId }).select("_id");
+  return employee ? employee._id : false;
+}
+
+export async function listDocuments(orgId, query = {}, actor) {
   const { page, limit, skip } = parsePagination(query);
   const filter = { organizationId: orgId };
   if (query.employee) filter.employee = query.employee;
@@ -20,6 +36,16 @@ export async function listDocuments(orgId, query = {}) {
   }
   if (query.search) filter.name = new RegExp(escapeRegex(query.search), "i");
 
+  const ownId = await ownScopeFor(orgId, actor);
+  if (ownId === false) return paginated([], 0, { page, limit });
+  if (ownId) {
+    // Self-service viewer — restrict to their own documents plus org-level
+    // ones (e.g. a handbook), regardless of what `employee`/`orgLevel` the
+    // query string asked for.
+    delete filter.employee;
+    filter.$or = [{ employee: ownId }, { employee: null }];
+  }
+
   const [items, total] = await Promise.all([
     HrDocument.find(filter)
       .sort({ expiryDate: 1, createdAt: -1 })
@@ -31,12 +57,18 @@ export async function listDocuments(orgId, query = {}) {
   return paginated(items, total, { page, limit });
 }
 
-export async function getDocument(orgId, id) {
+export async function getDocument(orgId, id, actor) {
   const doc = await HrDocument.findOne({ _id: id, organizationId: orgId }).populate(
     "employee",
     "firstName lastName employeeId",
   );
   if (!doc) throw AppError.notFound("Document not found");
+
+  const ownId = await ownScopeFor(orgId, actor);
+  if (ownId !== null) {
+    const allowed = !doc.employee || (ownId && String(doc.employee._id || doc.employee) === String(ownId));
+    if (!allowed) throw AppError.notFound("Document not found");
+  }
   return doc;
 }
 
@@ -103,11 +135,18 @@ export async function deleteDocument(orgId, id) {
   return { ok: true };
 }
 
-export async function expirySummary(orgId) {
+export async function expirySummary(orgId, actor) {
   const oidOrg = oid(orgId);
   const now = new Date();
+  const ownId = await ownScopeFor(orgId, actor);
+  const scopeMatch =
+    ownId === false
+      ? { _id: null } // no linked employee record — match nothing
+      : ownId
+        ? { $or: [{ employee: ownId }, { employee: null }] }
+        : {};
   const rows = await HrDocument.aggregate([
-    { $match: { organizationId: oidOrg, status: { $ne: "archived" }, expiryDate: { $ne: null } } },
+    { $match: { organizationId: oidOrg, status: { $ne: "archived" }, expiryDate: { $ne: null }, ...scopeMatch } },
     {
       $project: {
         bucket: {
@@ -130,6 +169,7 @@ export async function expirySummary(orgId) {
     organizationId: orgId,
     status: { $ne: "archived" },
     expiryDate: { $gte: now, $lte: new Date(now.getTime() + 30 * 86400000) },
+    ...scopeMatch,
   })
     .sort({ expiryDate: 1 })
     .limit(15)
