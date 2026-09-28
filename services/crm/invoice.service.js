@@ -3,6 +3,7 @@ import { Customer } from "../../models/crm/Customer.js";
 import { Organization } from "../../models/hrm/Organization.js";
 import { nextCode } from "../../models/crm/Counter.js";
 import { AppError } from "../../utils/AppError.js";
+import { hasPermission } from "../../utils/permissions.js";
 import { parsePagination, paginated } from "../../utils/query.js";
 import { generateInvoicePdf } from "../pdf.service.js";
 import { sendEmail } from "./email.service.js";
@@ -90,11 +91,20 @@ export async function setInvoiceStatus(tenantId, id, status) {
   return invoice;
 }
 
-export async function deleteInvoice(tenantId, id) {
+/**
+ * A regular `invoice:write` holder can only delete a still-draft document —
+ * once it's sent or paid, void it instead so the record (and any money
+ * already collected) stays traceable. Super Admin can delete regardless of
+ * status; this is also the only way to delete a *receipt*, since receipts
+ * are created already "paid" (there's no draft stage for money already in
+ * hand) and would otherwise be permanently undeletable by anyone.
+ */
+export async function deleteInvoice(tenantId, id, actor) {
   const invoice = await Invoice.findOne({ _id: id, tenantId });
   if (!invoice) throw AppError.notFound("Invoice not found");
-  if (invoice.status === "sent" || invoice.status === "paid") {
-    throw AppError.badRequest("Cannot delete an invoice that's already been sent or paid — void it instead");
+  const isSuperAdmin = hasPermission(actor?.permissions, "*");
+  if (!isSuperAdmin && (invoice.status === "sent" || invoice.status === "paid")) {
+    throw AppError.badRequest("Cannot delete an invoice that's already been sent or paid — void it instead, or ask a Super Admin to delete it");
   }
   await invoice.deleteOne();
   return { ok: true };

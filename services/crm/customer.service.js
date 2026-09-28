@@ -235,9 +235,9 @@ export async function search(tenantId, term) {
 
 function matchReason(c, { rx, phone }) {
   if (rx.test(c.customerId)) return "customer id";
-  if (c.emails.some((e) => rx.test(e.value))) return "email";
-  if (phone && c.phones.some((p) => p.value.endsWith(phone))) return "phone";
-  if (c.externalRefs.some((r) => rx.test(r.ref))) return "reference";
+  if ((c.emails || []).some((e) => rx.test(e.value))) return "email";
+  if (phone && (c.phones || []).some((p) => p.value.endsWith(phone))) return "phone";
+  if ((c.externalRefs || []).some((r) => rx.test(r.ref))) return "reference";
   return "name";
 }
 

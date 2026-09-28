@@ -122,10 +122,16 @@ customerSchema.virtual("displayName").get(function () {
 });
 
 customerSchema.virtual("primaryEmail").get(function () {
-  return (this.emails.find((e) => e.primary) || this.emails[0])?.value || null;
+  // The array default only fills in when the path is entirely absent — a
+  // document that ever had `emails` explicitly persisted as null (e.g. an
+  // old import) keeps that null on read, so this guards rather than assumes
+  // an array.
+  const emails = this.emails || [];
+  return (emails.find((e) => e.primary) || emails[0])?.value || null;
 });
 customerSchema.virtual("primaryPhone").get(function () {
-  return (this.phones.find((p) => p.primary) || this.phones[0])?.value || null;
+  const phones = this.phones || [];
+  return (phones.find((p) => p.primary) || phones[0])?.value || null;
 });
 
 customerSchema.set("toJSON", {

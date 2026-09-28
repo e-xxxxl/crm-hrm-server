@@ -35,7 +35,7 @@ export const setStatus = catchAsync(async (req, res) => {
 });
 
 export const remove = catchAsync(async (req, res) => {
-  await service.deleteInvoice(req.tenantId, req.params.id);
+  await service.deleteInvoice(req.tenantId, req.params.id, req.auth);
   await recordAudit(req, { action: "invoice.delete", entityType: "Invoice", entityId: req.params.id, summary: "Deleted an invoice" });
   res.json({ data: { ok: true } });
 });
