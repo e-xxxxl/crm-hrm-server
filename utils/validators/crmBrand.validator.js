@@ -28,6 +28,7 @@ export const createShipmentSchema = z.object({
   declaredValue: z.coerce.number().min(0).optional(),
   pieces: z.coerce.number().int().min(1).max(1000).optional(),
   serviceLevel: z.enum(["standard", "express", "same_day"]).optional(),
+  fulfillmentType: z.enum(["pickup", "drop_off", "sea_cargo"]).optional(),
   originHub: z.string().max(80).optional(),
   destinationHub: z.string().max(80).optional(),
   deliveryFee: z.coerce.number().min(0).optional(),
@@ -52,6 +53,39 @@ export const assignRiderSchema = z.object({
   riderId: objectId.optional(),
   riderName: z.string().max(120).optional(),
   riderPhone: z.string().max(40).optional(),
+});
+
+/* ---------- Invoices / receipts ---------- */
+
+const lineItem = z.object({
+  description: z.string().min(1).max(300),
+  quantity: z.coerce.number().min(0).max(100000).default(1),
+  unitPrice: z.coerce.number().min(0).max(1_000_000_000),
+});
+
+export const createInvoiceSchema = z.object({
+  customer: objectId,
+  kind: z.enum(["invoice", "receipt"]).optional(),
+  lineItems: z.array(lineItem).min(1).max(100),
+  currency: z.string().length(3).optional(),
+  taxRate: z.coerce.number().min(0).max(100).optional(),
+  notes: z.string().max(1000).optional(),
+  dueDate: z.coerce.date().optional(),
+});
+
+export const updateInvoiceSchema = z.object({
+  lineItems: z.array(lineItem).min(1).max(100).optional(),
+  taxRate: z.coerce.number().min(0).max(100).optional(),
+  notes: z.string().max(1000).optional(),
+  dueDate: z.coerce.date().optional(),
+});
+
+export const invoiceStatusSchema = z.object({
+  status: z.enum(["draft", "sent", "paid", "void"]),
+});
+
+export const sendInvoiceSchema = z.object({
+  to: z.string().email().optional(),
 });
 
 export const podSchema = z.object({

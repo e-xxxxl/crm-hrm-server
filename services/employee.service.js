@@ -4,10 +4,48 @@ import { Organization } from "../models/hrm/Organization.js";
 import { Department } from "../models/hrm/Department.js";
 import { Branch } from "../models/hrm/Branch.js";
 import { User } from "../models/hrm/User.js";
+import { Rider } from "../models/crm/Rider.js";
 import { nextCode } from "../models/hrm/Counter.js";
+import { nextCode as nextCrmCode } from "../models/crm/Counter.js";
 import { AppError } from "../utils/AppError.js";
-import { ROLES, hasPermission, isOrgAdmin } from "../utils/permissions.js";
+import { ROLES, hasPermission } from "../utils/permissions.js";
 import { parsePagination, parseSort, paginated, escapeRegex } from "../utils/query.js";
+
+/**
+ * The HRM "Employees" screen and the CRM "Riders" screen are two separate
+ * ways to end up with a login that has the Rider role — creating the login
+ * here (rather than through CRM → Riders → provision login) never created
+ * the matching Rider document, so the PWA's `selfRider()` lookup found
+ * nothing and the rider saw "your login is not linked to a rider profile".
+ * Called whenever an employee is granted (or switched to) the Rider role, so
+ * both paths land in the same place: an existing unlinked Rider for this
+ * phone gets linked, otherwise a minimal one is created.
+ */
+async function ensureRiderProfile(orgId, employee, user) {
+  const already = await Rider.findOne({ tenantId: orgId, user: user._id });
+  if (already) return already;
+
+  const unlinked = employee.phone ? await Rider.findOne({ tenantId: orgId, phone: employee.phone, user: null }) : null;
+  if (unlinked) {
+    unlinked.user = user._id;
+    unlinked.employee = employee._id;
+    await unlinked.save();
+    return unlinked;
+  }
+
+  const riderCode = await nextCrmCode("RID", `${orgId}:rider`, 4);
+  return Rider.create({
+    tenantId: orgId,
+    riderCode,
+    name: employee.fullName,
+    phone: employee.phone,
+    email: employee.email,
+    user: user._id,
+    employee: employee._id,
+    vehicleType: "bike",
+    status: "active",
+  });
+}
 
 const SORTABLE = ["lastName", "firstName", "employeeId", "position", "dateJoined", "createdAt", "employmentStatus"];
 
@@ -132,10 +170,19 @@ export async function createEmployee(orgId, input, actorUserId, actorPermissions
 }
 
 /**
- * Give an employee a platform login (idempotent-ish; refuses if email taken by
- * another org-less account). Granting the Super Admin role itself requires the
- * caller to already hold it (`actorPermissions` carries the wildcard `*`) —
- * otherwise any role with plain `employee:write` could mint itself an admin.
+ * Give an employee a platform login. Granting the Super Admin role itself
+ * requires the caller to already hold it (`actorPermissions` carries the
+ * wildcard `*`) — otherwise any role with plain `employee:write` could mint
+ * itself an admin.
+ *
+ * An employee's login is scoped to the organization that created them — if
+ * the email already belongs to a user with an active membership in a
+ * *different* org, this refuses rather than silently merging the two into
+ * one cross-org login (that would let one employee clock in/access data in
+ * an org they were never hired into). Genuine multi-org accounts (Super
+ * Admin, Group Admin) are provisioned deliberately through the admin
+ * registration flow (`auth.service.js#registerUser`), not through this
+ * per-employee "Create login" action.
  */
 export async function provisionEmployeeLogin(orgId, employee, { role, password } = {}, actorPermissions = []) {
   if (!ROLES.includes(role)) throw AppError.badRequest(`Unknown role "${role}"`);
@@ -157,6 +204,14 @@ export async function provisionEmployeeLogin(orgId, employee, { role, password }
     user.mustChangePassword = true;
     await user.save();
   } else if (!user.membershipFor(orgId)) {
+    const otherOrgMembership = (user.memberships || []).find(
+      (m) => m.status === "active" && String(m.organization) !== String(orgId),
+    );
+    if (otherOrgMembership) {
+      throw AppError.conflict(
+        `${employee.email} already has a login in another organization. Each employee's login is scoped to one organization — use a different email for this employee, or if they genuinely work across organizations, have a Super Admin add this org to their existing account instead of creating a new login here.`,
+      );
+    }
     user.memberships.push({ organization: orgId, role, status: "active", employee: employee._id });
     await user.save();
   } else {
@@ -167,6 +222,7 @@ export async function provisionEmployeeLogin(orgId, employee, { role, password }
 
   employee.user = user._id;
   await employee.save();
+  if (role === "Rider") await ensureRiderProfile(orgId, employee, user);
   return { user, tempPassword: user.mustChangePassword ? tempPassword : null };
 }
 
@@ -217,6 +273,7 @@ export async function updateEmployeeLogin(orgId, employee, input, actorPermissio
   }
 
   await user.save();
+  if (membership.role === "Rider") await ensureRiderProfile(orgId, employee, user);
   return getEmployeeLogin(orgId, employee);
 }
 
@@ -315,12 +372,12 @@ export async function setEmployeeStatus(orgId, id, status, reason, actorUserId) 
  * org (the whole User account too, if this was their only org). Records that
  * merely reference the employee as *someone else's* manager/reviewer/etc are
  * not deleted, just unlinked, so the org chart and other people's history
- * stay intact. Irreversible — only Super Admin, Group Admin, or HR Manager
- * may call this.
+ * stay intact. Irreversible — only a Super Admin may call this; Group Admin
+ * and HR Manager can edit and deactivate an employee but not delete one.
  */
 export async function deleteEmployee(orgId, id, actor) {
-  if (!isOrgAdmin(actor)) {
-    throw AppError.forbidden("Only a Super Admin, Group Admin, or HR Manager can delete an employee");
+  if (!hasPermission(actor?.permissions, "*")) {
+    throw AppError.forbidden("Only a Super Admin can delete an employee");
   }
   const employee = await Employee.findOne({ _id: id, organizationId: orgId });
   if (!employee) throw AppError.notFound("Employee not found");

@@ -52,6 +52,7 @@ export async function createShipment(tenantId, actor, input) {
     declaredValue: input.declaredValue || 0,
     pieces: input.pieces || 1,
     serviceLevel: input.serviceLevel || "standard",
+    fulfillmentType: input.fulfillmentType || "pickup",
     originHub: input.originHub,
     destinationHub: input.destinationHub,
     deliveryFee: input.deliveryFee || 0,
@@ -191,6 +192,11 @@ export async function assignRider(tenantId, actor, id, { riderId, riderName, rid
   if (!shipment) throw AppError.notFound("Shipment not found");
   if (TERMINAL_STATUSES.includes(shipment.status)) {
     throw AppError.badRequest("Shipment is already closed");
+  }
+  if (shipment.fulfillmentType !== "pickup") {
+    throw AppError.badRequest(
+      `${shipment.fulfillmentType === "sea_cargo" ? "Sea cargo" : "Drop-off"} shipments don't need a rider.`,
+    );
   }
 
   shipment.rider = riderId ? oid(riderId) : undefined;

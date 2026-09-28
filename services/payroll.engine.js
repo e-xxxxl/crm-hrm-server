@@ -15,6 +15,7 @@ export function calculatePayslip({
   tripAmountTotal = null, // sum of per-trip overrides; when null, use flat rate
   unpaidLeaveDays = 0,
   workingDaysInMonth = 22,
+  loanDeduction = 0, // this month's installment on an approved loan (computed by the caller from the Loan record)
 }) {
   const earnings = [];
   let commission = 0;
@@ -118,6 +119,14 @@ export function calculatePayslip({
     payeEmployer = taxDetail.employerMonthlyTax;
     if (paye > 0) deductions.push({ label: "PAYE tax (employee half)", amount: paye });
   }
+
+  // Post-tax deductions — taken from what's already been earned and taxed,
+  // so they don't touch the PAYE/pension base above.
+  const latenessDeduction = structure.latenessDeduction || 0;
+  if (latenessDeduction > 0) deductions.push({ label: "Lateness deduction", amount: roundMoney(latenessDeduction) });
+  const otherDeductions = structure.otherDeductions || 0;
+  if (otherDeductions > 0) deductions.push({ label: "Other deductions", amount: roundMoney(otherDeductions) });
+  if (loanDeduction > 0) deductions.push({ label: "Loan repayment", amount: roundMoney(loanDeduction) });
 
   const totalDeductions = roundMoney(deductions.reduce((s, d) => s + d.amount, 0));
   const netPay = roundMoney(grossEarnings - totalDeductions);

@@ -105,6 +105,20 @@ export const env = {
   smtpPass: optional("SMTP_PASS", ""),
   mailFrom: optional("MAIL_FROM", "CRM+HRM <no-reply@localhost>"),
 
+  // Customer-facing email (invoices/receipts, the CRM "Emails" tab) — sent via
+  // Resend. Each brand can have its own sending domain/key; a request falls
+  // back to the generic RESEND_API_KEY/RESEND_FROM_EMAIL when the brand-
+  // specific pair isn't set. Left unset, sends are refused with a clear error
+  // rather than silently failing or falling back to another brand's identity.
+  resendApiKey: optional("RESEND_API_KEY", ""),
+  resendFromEmail: optional("RESEND_FROM_EMAIL", ""),
+  resendApiKeyAjcl: optional("RESEND_API_KEY_AJCL", ""),
+  resendFromEmailAjcl: optional("RESEND_FROM_EMAIL_AJCL", ""),
+  resendApiKeyQsa: optional("RESEND_API_KEY_QSA", ""),
+  resendFromEmailQsa: optional("RESEND_FROM_EMAIL_QSA", ""),
+  resendApiKeyNtp: optional("RESEND_API_KEY_NTP", ""),
+  resendFromEmailNtp: optional("RESEND_FROM_EMAIL_NTP", ""),
+
   // Seed super admin (used only by scripts/seed.js)
   seedAdminEmail: optional("SEED_ADMIN_EMAIL", "admin@crmhrm.local"),
   seedAdminPassword: optional("SEED_ADMIN_PASSWORD", ""),

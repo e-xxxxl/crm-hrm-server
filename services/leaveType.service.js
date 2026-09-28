@@ -1,5 +1,6 @@
 import { LeaveType } from "../models/hrm/LeaveType.js";
 import { LeaveRequest } from "../models/hrm/LeaveRequest.js";
+import { LeaveBalance } from "../models/hrm/LeaveBalance.js";
 import { AppError } from "../utils/AppError.js";
 import { escapeRegex } from "../utils/query.js";
 
@@ -44,13 +45,38 @@ export async function createLeaveType(orgId, input) {
   return LeaveType.create({ ...input, organizationId: orgId });
 }
 
+/**
+ * A balance's `entitledDays` is copied from the leave type's
+ * `defaultDaysPerYear` once, the first time an employee needs a balance for
+ * it (see leave.service.js#getOrCreateBalance) — it's not a live reference.
+ * So editing the policy here used to leave every already-created balance for
+ * the current year stuck on the old number ("changed to 15, still showing
+ * 20"). When the default changes, bring the current year's balances that
+ * are still sitting on the *old* default up to the new one — anyone whose
+ * balance was individually adjusted away from the default is left alone.
+ */
 export async function updateLeaveType(orgId, id, input) {
+  const before = await LeaveType.findOne({ _id: id, organizationId: orgId });
+  if (!before) throw AppError.notFound("Leave type not found");
+
   const t = await LeaveType.findOneAndUpdate(
     { _id: id, organizationId: orgId },
     { $set: input },
     { new: true, runValidators: true },
   );
-  if (!t) throw AppError.notFound("Leave type not found");
+
+  if (input.defaultDaysPerYear !== undefined && input.defaultDaysPerYear !== before.defaultDaysPerYear) {
+    await LeaveBalance.updateMany(
+      {
+        organizationId: orgId,
+        leaveType: id,
+        year: new Date().getFullYear(),
+        entitledDays: before.defaultDaysPerYear,
+      },
+      { $set: { entitledDays: input.defaultDaysPerYear } },
+    );
+  }
+
   return t;
 }
 

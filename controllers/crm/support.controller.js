@@ -45,6 +45,11 @@ export const deleteComm = catchAsync(async (req, res) => {
   await recordAudit(req, { action: "communication.delete", entityType: "Communication", entityId: req.params.id, summary: "Deleted a communication log" });
   res.json({ data: result });
 });
+export const sendEmail = catchAsync(async (req, res) => {
+  const comm = await comms.sendEmailToCustomer(req.tenantId, req.auth, req.body);
+  await recordAudit(req, { action: "communication.email", entityType: "Communication", entityId: comm._id, summary: `Emailed customer: ${comm.subject}` });
+  res.status(201).json({ data: comm });
+});
 
 /* ---- Sales ---- */
 export const salesOverview = catchAsync(async (req, res) => {
@@ -62,5 +67,6 @@ export default {
   listComms,
   logComm,
   deleteComm,
+  sendEmail,
   salesOverview,
 };

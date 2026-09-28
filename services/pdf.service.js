@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { resolveLogoBuffer } from "../utils/orgLogo.js";
 
 const NGN = (n) =>
   "NGN " +
@@ -103,6 +104,97 @@ export function generatePayslipPdf(payslip, organization) {
   });
 }
 
+/** Render an invoice/receipt to a PDF Buffer, with the org's logo (own upload, or brand default) in the header. */
+export async function generateInvoicePdf(invoice, organization) {
+  const logo = await resolveLogoBuffer(organization);
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    const chunks = [];
+    doc.on("data", (c) => chunks.push(c));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    const left = doc.page.margins.left;
+    const right = doc.page.width - doc.page.margins.right;
+    const width = right - left;
+
+    // Header — logo on the left, org details + doc title on the right.
+    let headerBottom = 50;
+    if (logo) {
+      try {
+        doc.image(logo, left, 45, { fit: [110, 50] });
+        headerBottom = Math.max(headerBottom, 45 + 50);
+      } catch {
+        /* corrupt/unreadable image — skip it rather than fail the PDF */
+      }
+    }
+    const titleX = logo ? left + 130 : left;
+    doc.fontSize(16).font("Helvetica-Bold").text(organization?.name || "Organization", titleX, 50, { width: right - titleX });
+    if (organization?.address) {
+      doc.fontSize(9).font("Helvetica").fillColor("#555").text(organization.address, titleX, doc.y, { width: right - titleX });
+    }
+    doc.fillColor("#000");
+
+    let y = Math.max(doc.y, headerBottom) + 14;
+    doc.moveTo(left, y).lineTo(right, y).strokeColor("#ddd").stroke();
+    y += 12;
+
+    doc.fontSize(14).font("Helvetica-Bold").text(invoice.kind === "receipt" ? "Receipt" : "Invoice", left, y);
+    doc
+      .fontSize(9)
+      .font("Helvetica")
+      .fillColor("#555")
+      .text(`${invoice.number}  ·  ${new Date(invoice.createdAt || Date.now()).toLocaleDateString("en-NG")}`, left, doc.y);
+    doc.fillColor("#000");
+    y = doc.y + 16;
+
+    const c = invoice.customerSnapshot || {};
+    doc.fontSize(9).font("Helvetica-Bold").text("Billed to", left, y);
+    doc.font("Helvetica").text(c.name || "—", left, y + 12);
+    if (c.email) doc.text(c.email, left, y + 24);
+    if (c.phone) doc.text(c.phone, left, y + 36);
+    y += 60;
+
+    // Line items
+    doc.fontSize(9).font("Helvetica-Bold");
+    doc.text("Description", left, y, { width: width * 0.5 });
+    doc.text("Qty", left + width * 0.5, y, { width: width * 0.15, align: "right" });
+    doc.text("Unit price", left + width * 0.65, y, { width: width * 0.17, align: "right" });
+    doc.text("Amount", left + width * 0.82, y, { width: width * 0.18, align: "right" });
+    y += 14;
+    doc.moveTo(left, y).lineTo(right, y).strokeColor("#ddd").stroke();
+    y += 6;
+    doc.font("Helvetica");
+    for (const item of invoice.lineItems || []) {
+      doc.text(item.description, left, y, { width: width * 0.5 });
+      doc.text(String(item.quantity), left + width * 0.5, y, { width: width * 0.15, align: "right" });
+      doc.text(NGN(item.unitPrice), left + width * 0.65, y, { width: width * 0.17, align: "right" });
+      doc.text(NGN(item.amount), left + width * 0.82, y, { width: width * 0.18, align: "right" });
+      y += 16;
+    }
+    y += 6;
+    doc.moveTo(left, y).lineTo(right, y).strokeColor("#ddd").stroke();
+    y += 8;
+
+    y = totalLine(doc, "Subtotal", invoice.subtotal, left, right, y);
+    if (invoice.taxRate > 0) y = totalLine(doc, `Tax (${invoice.taxRate}%)`, invoice.taxAmount, left, right, y);
+    doc.moveTo(left, y).lineTo(right, y).strokeColor("#000").stroke();
+    y += 8;
+    doc.fontSize(12).font("Helvetica-Bold").text("Total", left, y);
+    doc.text(NGN(invoice.total), left, y, { width, align: "right" });
+    y += 28;
+
+    if (invoice.notes) {
+      doc.fontSize(9).font("Helvetica-Bold").text("Notes", left, y);
+      doc.font("Helvetica").fillColor("#555").text(invoice.notes, left, y + 12, { width });
+      doc.fillColor("#000");
+    }
+
+    doc.end();
+  });
+}
+
 function section(doc, title, items, left, right, y) {
   const width = right - left;
   doc.fontSize(10).font("Helvetica-Bold").fillColor("#000").text(title, left, y);
@@ -131,4 +223,4 @@ function totalLine(doc, label, amount, left, right, y) {
   return y + 16;
 }
 
-export default { generatePayslipPdf };
+export default { generatePayslipPdf, generateInvoicePdf };

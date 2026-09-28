@@ -40,6 +40,10 @@ router.post("/runs/:id/calculate", checkPermission("payroll:run"), validate(calc
 router.post("/runs/:id/approve", checkPermission("payroll:approve"), ctrl.approveRun);
 router.post("/runs/:id/finalize", checkPermission("payroll:approve"), ctrl.finalizeRun);
 router.post("/runs/:id/cancel", checkPermission("payroll:run"), ctrl.cancelRun);
+// Reopening/deleting a run that's already gone through approval touches
+// finalized financial records — restricted to Super Admin.
+router.post("/runs/:id/reopen", requireRole("Super Admin"), ctrl.reopenRun);
+router.delete("/runs/:id", requireRole("Super Admin"), ctrl.deleteRun);
 router.get("/runs/:id/bank-export", checkPermission("payroll:export"), ctrl.bankExport);
 
 /* Payslips */
@@ -48,6 +52,7 @@ router.get("/payslips/mine", checkPermission("payroll:read_own"), ctrl.myPayslip
 router.get("/payslips/:id", checkPermission(["payroll:read", "payroll:read_own"], { mode: "any" }), ctrl.getPayslip);
 router.get("/payslips/:id/pdf", checkPermission(["payroll:read", "payroll:read_own"], { mode: "any" }), ctrl.payslipPdf);
 router.post("/payslips/:id/mark-paid", checkPermission("payroll:approve"), ctrl.markPaid);
+router.post("/runs/:id/mark-all-paid", checkPermission("payroll:approve"), ctrl.markAllPaid);
 
 /* Trip logs (hybrid payroll input) */
 router.get("/trips", checkPermission("payroll:read"), validate(tripListQuerySchema, "query"), ctrl.listTrips);

@@ -26,7 +26,10 @@ export const SHIPMENT_STATUSES = [
 ];
 
 export const SHIPMENT_TRANSITIONS = {
-  created: ["pickup_requested", "rider_assigned", "returned"],
+  // "at_hub" direct from "created" is for drop_off/sea_cargo shipments, which
+  // skip pickup_requested/rider_assigned entirely — the sender brings the
+  // parcel in (or it arrives by ship) rather than a rider collecting it.
+  created: ["pickup_requested", "rider_assigned", "at_hub", "returned"],
   pickup_requested: ["rider_assigned", "returned"],
   rider_assigned: ["picked_up", "pickup_requested", "returned"],
   picked_up: ["at_hub", "in_transit", "out_for_delivery", "returned"],
@@ -104,6 +107,11 @@ const shipmentSchema = new Schema(
     pieces: { type: Number, default: 1 },
 
     serviceLevel: { type: String, enum: ["standard", "express", "same_day"], default: "standard" },
+    // How the shipment moves: "pickup" is a rider collecting from the sender
+    // (the only kind that gets a rider assigned); "drop_off" is the sender
+    // bringing the parcel to a hub themselves; "sea_cargo" travels by ship,
+    // handled at the port/hub, not by a courier rider.
+    fulfillmentType: { type: String, enum: ["pickup", "drop_off", "sea_cargo"], default: "pickup" },
     originHub: { type: String, trim: true },
     destinationHub: { type: String, trim: true },
 

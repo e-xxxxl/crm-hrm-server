@@ -1,10 +1,12 @@
 import mongoose from "mongoose";
 import { Communication } from "../../models/crm/Communication.js";
 import { Customer } from "../../models/crm/Customer.js";
+import { Organization } from "../../models/hrm/Organization.js";
 import { AppError } from "../../utils/AppError.js";
 import { parsePagination, paginated, escapeRegex } from "../../utils/query.js";
 import { registerHistoryProvider } from "./registry.js";
 import * as customerService from "./customer.service.js";
+import { sendEmail } from "./email.service.js";
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
 
@@ -38,6 +40,36 @@ export async function logCommunication(tenantId, actor, input) {
     await customerService.bumpStats(tenantId, customer._id, {});
   }
   return comm;
+}
+
+/**
+ * The CRM "Emails" tab — an actual outbound email (via Resend, sent as the
+ * org's own brand identity), not just a logged record. Logged as a
+ * Communication afterward so it also shows up in the customer's history
+ * alongside calls/notes/etc.
+ */
+export async function sendEmailToCustomer(tenantId, actor, { customer: customerId, subject, body }) {
+  const customer = await Customer.findOne({ _id: customerId, tenantId });
+  if (!customer) throw AppError.badRequest("Unknown customer");
+  const to = customer.primaryEmail;
+  if (!to) throw AppError.badRequest("This customer has no email on file");
+
+  const org = await Organization.findById(tenantId);
+  await sendEmail(org?.code, {
+    to,
+    subject,
+    html: body.replace(/\n/g, "<br>"),
+    text: body,
+  });
+
+  return logCommunication(tenantId, actor, {
+    customer: customerId,
+    channel: "email",
+    direction: "outbound",
+    subject,
+    body,
+    source: "manual",
+  });
 }
 
 export async function listCommunications(tenantId, query = {}) {
@@ -83,4 +115,4 @@ registerHistoryProvider("communications", async (tenantId, customerId, opts = {}
   }));
 });
 
-export default { logCommunication, listCommunications, deleteCommunication };
+export default { logCommunication, sendEmailToCustomer, listCommunications, deleteCommunication };

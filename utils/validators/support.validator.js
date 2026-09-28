@@ -57,6 +57,12 @@ export const logCommSchema = z.object({
   attachments: z.array(z.object({ name: z.string().max(200), url: z.string().max(500) })).max(10).optional(),
 });
 
+export const sendEmailSchema = z.object({
+  customer: objectId,
+  subject: z.string().min(1).max(200),
+  body: z.string().min(1).max(10000),
+});
+
 export const commListQuerySchema = z.object({
   customer: objectId.optional(),
   channel: z.string().max(20).optional(),
@@ -87,6 +93,7 @@ export default {
   taskCommentSchema,
   taskListQuerySchema,
   logCommSchema,
+  sendEmailSchema,
   commListQuerySchema,
   auditQuerySchema,
 };

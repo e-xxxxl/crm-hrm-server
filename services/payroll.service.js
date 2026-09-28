@@ -9,10 +9,13 @@ import { Employee } from "../models/hrm/Employee.js";
 import { Organization } from "../models/hrm/Organization.js";
 import { nextCode } from "../models/hrm/Counter.js";
 import { AppError } from "../utils/AppError.js";
+import { hasPermission } from "../utils/permissions.js";
 import { parsePagination, paginated } from "../utils/query.js";
 import { monthDayKeys, dayKeyToDate, zonedWeekday, eachDayKey } from "../utils/datetime.js";
 import { calculatePayslip } from "./payroll.engine.js";
 import { roundMoney } from "../utils/payroll/tax.js";
+import { Loan } from "../models/hrm/Loan.js";
+import { applyInstallment, reverseInstallment } from "./loan.service.js";
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
 const MONTHS = [
@@ -151,6 +154,17 @@ export async function calculateRun(orgId, id, actor, { excludeEmployees = [] } =
     tripsByEmp = new Map(trips.map((t) => [String(t._id), t]));
   }
 
+  // Active loans with a balance still owed — this run's installment is
+  // min(monthlyDeduction, balanceRemaining) so the last payment doesn't
+  // overshoot. Only actually deducted from the balance at finalizeRun.
+  const loans = await Loan.find({
+    organizationId: orgId,
+    employee: { $in: employees.map((e) => e._id) },
+    status: "approved",
+    balanceRemaining: { $gt: 0 },
+  });
+  const loanByEmp = new Map(loans.map((l) => [String(l.employee), l]));
+
   await Payslip.deleteMany({ organizationId: orgId, payrollRun: id });
 
   const totals = {
@@ -178,6 +192,9 @@ export async function calculateRun(orgId, id, actor, { excludeEmployees = [] } =
       ? tripAgg.overrideTotal + (tripAgg.count - tripAgg.overrideCount) * (structure.commissionPerTrip || 0)
       : null;
 
+    const loan = loanByEmp.get(String(emp._id));
+    const loanDeduction = loan ? roundMoney(Math.min(loan.monthlyDeduction, loan.balanceRemaining)) : 0;
+
     const calc = calculatePayslip({
       strategy: org.payrollStrategy,
       structure,
@@ -185,6 +202,7 @@ export async function calculateRun(orgId, id, actor, { excludeEmployees = [] } =
       tripAmountTotal: org.payrollStrategy === "hybrid" ? tripAmountTotal : null,
       unpaidLeaveDays: unpaidDaysByEmp.get(String(emp._id)) || 0,
       workingDaysInMonth,
+      loanDeduction,
     });
 
     docs.push({
@@ -220,6 +238,8 @@ export async function calculateRun(orgId, id, actor, { excludeEmployees = [] } =
       pensionEmployee: calc.pensionEmployee,
       pensionEmployer: calc.pensionEmployer,
       nhf: calc.nhf,
+      loan: loan?._id,
+      loanDeduction,
       totalDeductions: calc.totalDeductions,
       netPay: calc.netPay,
       taxDetail: calc.taxDetail,
@@ -281,6 +301,15 @@ export async function finalizeRun(orgId, id, actor) {
       { $set: { payrollRun: id } },
     );
   }
+
+  // Take this run's loan installments off each borrower's balance now that
+  // pay is actually locked in — not at calculate time, so recalculating a
+  // still-draft run doesn't double-deduct.
+  const withLoans = await Payslip.find({ organizationId: orgId, payrollRun: id, loanDeduction: { $gt: 0 } }).select("loan loanDeduction");
+  for (const slip of withLoans) {
+    if (slip.loan) await applyInstallment(orgId, slip.loan, slip.loanDeduction);
+  }
+
   return run;
 }
 
@@ -292,6 +321,103 @@ export async function cancelRun(orgId, id) {
   await run.save();
   await Payslip.deleteMany({ organizationId: orgId, payrollRun: id });
   return run;
+}
+
+/** Release the hybrid-strategy trip logs a run had claimed, back to unconsumed. */
+async function releaseRunTrips(orgId, run) {
+  if (run.strategy !== "hybrid") return;
+  await TripLog.updateMany({ organizationId: orgId, payrollRun: run._id }, { $set: { payrollRun: null } });
+}
+
+/**
+ * Reopen an approved/finalized run for correction — Super Admin only. Drops
+ * it back to "calculated" (clearing approval/finalization) so calculateRun
+ * can recompute it, and releases any trip logs it had claimed so they're
+ * counted again rather than silently dropped. Refuses once any payslip in
+ * the run has actually been marked paid — money has moved at that point, and
+ * reopening should not quietly rewrite what was paid; correct those
+ * individually instead.
+ */
+export async function reopenRun(orgId, id, actor) {
+  if (!hasPermission(actor?.permissions, "*")) {
+    throw AppError.forbidden("Only a Super Admin can reopen a payroll run");
+  }
+  const run = await PayrollRun.findOne({ _id: id, organizationId: orgId });
+  if (!run) throw AppError.notFound("Payroll run not found");
+  if (!["approved", "finalized"].includes(run.status)) {
+    throw AppError.badRequest(`Only an approved or finalized run can be reopened (currently ${run.status})`);
+  }
+  const paidCount = await Payslip.countDocuments({ organizationId: orgId, payrollRun: id, status: "paid" });
+  if (paidCount > 0) {
+    throw AppError.badRequest(
+      `Cannot reopen — ${paidCount} payslip(s) in this run are already marked paid. Correct those individually.`,
+    );
+  }
+
+  await releaseRunTrips(orgId, run);
+
+  // Finalizing had already taken this run's loan installments off borrowers'
+  // balances — put them back so recalculation doesn't understate what's owed.
+  if (run.status === "finalized") {
+    const withLoans = await Payslip.find({ organizationId: orgId, payrollRun: id, loanDeduction: { $gt: 0 } }).select("loan loanDeduction");
+    for (const slip of withLoans) {
+      if (slip.loan) await reverseInstallment(orgId, slip.loan, slip.loanDeduction);
+    }
+  }
+
+  run.status = "calculated";
+  run.approvedBy = undefined;
+  run.approvedAt = undefined;
+  run.finalizedBy = undefined;
+  run.finalizedAt = undefined;
+  await run.save();
+  return run;
+}
+
+/**
+ * Permanently delete a payroll run and its payslips — Super Admin only.
+ * Refuses once any payslip has been marked paid, for the same reason
+ * reopenRun does: that's a real financial record, not a draft to discard.
+ * Use cancelRun (still-draft/calculated/approved) or reopenRun+cancelRun for
+ * anything already paid.
+ */
+export async function deleteRun(orgId, id, actor) {
+  if (!hasPermission(actor?.permissions, "*")) {
+    throw AppError.forbidden("Only a Super Admin can delete a payroll run");
+  }
+  const run = await PayrollRun.findOne({ _id: id, organizationId: orgId });
+  if (!run) throw AppError.notFound("Payroll run not found");
+  const paidCount = await Payslip.countDocuments({ organizationId: orgId, payrollRun: id, status: "paid" });
+  if (paidCount > 0) {
+    throw AppError.badRequest(`Cannot delete — ${paidCount} payslip(s) in this run are already marked paid.`);
+  }
+
+  await releaseRunTrips(orgId, run);
+
+  if (run.status === "finalized") {
+    const withLoans = await Payslip.find({ organizationId: orgId, payrollRun: id, loanDeduction: { $gt: 0 } }).select("loan loanDeduction");
+    for (const slip of withLoans) {
+      if (slip.loan) await reverseInstallment(orgId, slip.loan, slip.loanDeduction);
+    }
+  }
+
+  await Payslip.deleteMany({ organizationId: orgId, payrollRun: id });
+  await run.deleteOne();
+  return { ok: true };
+}
+
+/** Mark every still-pending payslip in a finalized run as paid, in one action. */
+export async function markAllPaid(orgId, runId) {
+  const run = await PayrollRun.findOne({ _id: runId, organizationId: orgId });
+  if (!run) throw AppError.notFound("Payroll run not found");
+  if (run.status !== "finalized") {
+    throw AppError.badRequest("The payroll run must be finalized before marking payslips paid");
+  }
+  const result = await Payslip.updateMany(
+    { organizationId: orgId, payrollRun: runId, status: { $ne: "paid" } },
+    { $set: { status: "paid", paidAt: new Date() } },
+  );
+  return { marked: result.modifiedCount ?? result.nModified ?? 0 };
 }
 
 /* ------------------------------ payslips ----------------------------- */
@@ -374,9 +500,12 @@ export default {
   approveRun,
   finalizeRun,
   cancelRun,
+  reopenRun,
+  deleteRun,
   listPayslips,
   getPayslip,
   employeePayslips,
   markPayslipPaid,
+  markAllPaid,
   bankExportCsv,
 };

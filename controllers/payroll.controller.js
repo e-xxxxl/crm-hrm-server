@@ -128,6 +128,29 @@ export const cancelRun = catchAsync(async (req, res) => {
   res.json({ data: run });
 });
 
+export const reopenRun = catchAsync(async (req, res) => {
+  const run = await payroll.reopenRun(req.orgId, req.params.id, req.auth);
+  await recordAudit(req, {
+    action: "payroll_run.reopen",
+    entityType: "PayrollRun",
+    entityId: run._id,
+    entityLabel: run.reference,
+    summary: `Reopened payroll run ${run.reference} for correction`,
+  });
+  res.json({ data: run });
+});
+
+export const deleteRun = catchAsync(async (req, res) => {
+  await payroll.deleteRun(req.orgId, req.params.id, req.auth);
+  await recordAudit(req, {
+    action: "payroll_run.delete",
+    entityType: "PayrollRun",
+    entityId: req.params.id,
+    summary: "Deleted a payroll run",
+  });
+  res.json({ data: { ok: true } });
+});
+
 export const bankExport = catchAsync(async (req, res) => {
   const csv = await payroll.bankExportCsv(req.orgId, req.params.id);
   await recordAudit(req, {
@@ -171,6 +194,17 @@ export const markPaid = catchAsync(async (req, res) => {
     summary: `Marked payslip paid — ${slip.employeeSnapshot?.name}`,
   });
   res.json({ data: slip });
+});
+
+export const markAllPaid = catchAsync(async (req, res) => {
+  const result = await payroll.markAllPaid(req.orgId, req.params.id);
+  await recordAudit(req, {
+    action: "payroll_run.mark_all_paid",
+    entityType: "PayrollRun",
+    entityId: req.params.id,
+    summary: `Marked ${result.marked} payslip(s) paid`,
+  });
+  res.json({ data: result });
 });
 
 export const payslipPdf = catchAsync(async (req, res) => {
@@ -225,11 +259,14 @@ export default {
   approveRun,
   finalizeRun,
   cancelRun,
+  reopenRun,
+  deleteRun,
   bankExport,
   listPayslips,
   getPayslip,
   myPayslips,
   markPaid,
+  markAllPaid,
   payslipPdf,
   listTrips,
   createTrip,

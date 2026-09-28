@@ -40,6 +40,14 @@ const salaryStructureSchema = new Schema(
     overtime: { type: Number, default: 0, min: 0 }, // not taxed — excluded from the PAYE base like the other allowances above
     customEarnings: { type: [customComponent], default: [] },
 
+    // Recurring deductions (monthly). Post-tax — they reduce net pay, not the
+    // PAYE base (the employee already earned and was taxed on the full
+    // gross; these are taken out afterward). Loan repayment is NOT stored
+    // here — it's computed per payroll run from the employee's approved Loan
+    // record (see payroll.service.js), so its balance can count down.
+    latenessDeduction: { type: Number, default: 0, min: 0 },
+    otherDeductions: { type: Number, default: 0, min: 0 },
+
     // Strategy-specific
     grossMonthly: { type: Number, default: 0, min: 0 }, // fixed-monthly override
     commissionPerTrip: { type: Number, default: 0, min: 0 }, // hybrid

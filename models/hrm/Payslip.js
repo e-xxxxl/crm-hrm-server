@@ -48,6 +48,12 @@ const payslipSchema = new Schema(
     pensionEmployee: { type: Number, default: 0 },
     pensionEmployer: { type: Number, default: 0 },
     nhf: { type: Number, default: 0 },
+    // This period's loan installment, if any — also present as a line in
+    // `deductions`. Kept denormalized here so finalizeRun can decrement the
+    // Loan's balanceRemaining for exactly the employees it applied to,
+    // without re-deriving it from the deductions array by label matching.
+    loan: { type: Schema.Types.ObjectId, ref: "Loan" },
+    loanDeduction: { type: Number, default: 0 },
     totalDeductions: { type: Number, default: 0 },
 
     netPay: { type: Number, default: 0 },

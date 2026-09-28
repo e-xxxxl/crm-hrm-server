@@ -48,10 +48,10 @@ router.patch(
   validate(employeeStatusSchema),
   ctrl.setStatus,
 );
-// Delete cascades through every record about the employee — restricted to
-// Super Admin, Group Admin, and HR Manager (see employee.service.js
-// deleteEmployee, which double-checks this).
-router.delete("/:id", requireRole(...ADMIN_ROLES), ctrl.remove);
+// Delete cascades through every record about the employee — Super Admin
+// only (see employee.service.js deleteEmployee, which double-checks this).
+// Group Admin and HR Manager can still edit and deactivate (see above).
+router.delete("/:id", requireRole("Super Admin"), ctrl.remove);
 
 // View/edit/reset an employee's platform login — same three roles.
 router.get("/:id/login", requireRole(...ADMIN_ROLES), ctrl.getLogin);

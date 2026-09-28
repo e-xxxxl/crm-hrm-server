@@ -11,6 +11,7 @@ import {
   taskCommentSchema,
   taskListQuerySchema,
   logCommSchema,
+  sendEmailSchema,
   commListQuerySchema,
 } from "../../utils/validators/support.validator.js";
 
@@ -32,6 +33,7 @@ router.post("/tasks/:id/comments", taskWrite, validate(taskCommentSchema), ctrl.
 router.get("/communications", checkPermission("communication:read"), validate(commListQuerySchema, "query"), ctrl.listComms);
 router.post("/communications", checkPermission("communication:write"), validate(logCommSchema), ctrl.logComm);
 router.delete("/communications/:id", checkPermission("communication:delete"), ctrl.deleteComm);
+router.post("/emails/send", checkPermission("communication:write"), validate(sendEmailSchema), ctrl.sendEmail);
 
 /* Sales */
 router.get("/sales/overview", checkPermission("report:crm"), ctrl.salesOverview);

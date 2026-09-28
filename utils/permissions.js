@@ -96,6 +96,7 @@ export const PERMISSIONS = {
   rider: ["rider:read", "rider:write", "rider:job"],
   task: ["task:read", "task:write"],
   communication: ["communication:read", "communication:write", "communication:delete"],
+  invoice: ["invoice:read", "invoice:write"],
 };
 
 /** Flattened list of every permission string. */
@@ -139,6 +140,7 @@ export const ROLE_PERMISSIONS = {
     ...P.rider,
     ...P.task,
     ...P.communication,
+    ...P.invoice,
   ],
 
   "Brand Admin": [
@@ -170,6 +172,7 @@ export const ROLE_PERMISSIONS = {
     ...P.rider,
     ...P.task,
     ...P.communication,
+    ...P.invoice,
   ],
 
   "HR Manager": [
@@ -184,16 +187,26 @@ export const ROLE_PERMISSIONS = {
     "attendance:manage",
     "attendance:report",
     ...P.leave,
+    // Full payroll access except deleting/reopening a finalized run, which
+    // stays Super-Admin-only regardless of permissions (see
+    // requireRole("Super Admin") on those routes in payroll.routes.js).
     "payroll:read",
+    "payroll:run",
+    "payroll:approve",
+    "payroll:export",
     "payroll:configure",
     ...P.performance,
     ...P.target,
     ...P.recruitment,
     ...P.document,
-    "training:read",
+    ...P.training,
     ...P.disciplinary,
     "notification:read",
     "report:hr",
+    // HR edits rider profiles (name, phone, vehicle, docs) in the CRM Riders
+    // directory, alongside Super Admin and CRM Manager.
+    "rider:read",
+    "rider:write",
   ],
 
   "CRM Manager": [
@@ -213,6 +226,7 @@ export const ROLE_PERMISSIONS = {
     ...P.rider,
     ...P.task,
     ...P.communication,
+    ...P.invoice,
   ],
 
   "Finance": [
@@ -248,6 +262,8 @@ export const ROLE_PERMISSIONS = {
     "task:write",
     "communication:read",
     "communication:write",
+    "invoice:read",
+    "invoice:write",
     "report:crm",
   ],
 
@@ -298,6 +314,8 @@ export const ROLE_PERMISSIONS = {
     "task:write",
     "communication:read",
     "communication:write",
+    "invoice:read",
+    "invoice:write",
   ],
 
   "Sales Staff": [
@@ -317,6 +335,8 @@ export const ROLE_PERMISSIONS = {
     "task:write",
     "communication:read",
     "communication:write",
+    "invoice:read",
+    "invoice:write",
     "report:crm",
   ],
 
@@ -351,6 +371,8 @@ export const ROLE_PERMISSIONS = {
     "task:write",
     "communication:read",
     "communication:write",
+    "invoice:read",
+    "invoice:write",
   ],
 
   "Staff": [
@@ -380,6 +402,8 @@ export const ROLE_PERMISSIONS = {
     "task:write",
     "communication:read",
     "communication:write",
+    "invoice:read",
+    "invoice:write",
   ],
 };
 
@@ -402,16 +426,6 @@ export function hasPermission(permissions, required) {
   return permissions.includes(required);
 }
 
-/**
- * The three roles explicitly trusted to edit/delete records org-wide and
- * manage other people's logins: Super Admin, Group Admin, HR Manager.
- * Narrower than the various `*:write` permissions (which Brand Admin also
- * holds) — used specifically where the user asked for exactly these three.
- */
-export function isOrgAdmin(actor) {
-  return hasPermission(actor?.permissions, "*") || ["Group Admin", "HR Manager"].includes(actor?.role);
-}
-
 export default {
   ROLES,
   roleRank,
@@ -420,5 +434,4 @@ export default {
   ROLE_PERMISSIONS,
   resolvePermissions,
   hasPermission,
-  isOrgAdmin,
 };
