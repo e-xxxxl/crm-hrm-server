@@ -61,6 +61,7 @@ export const sendEmailSchema = z.object({
   customer: objectId,
   subject: z.string().min(1).max(200),
   body: z.string().min(1).max(10000),
+  attachments: z.array(z.object({ id: objectId, name: z.string().max(200).optional() })).max(5).optional(),
 });
 
 export const commListQuerySchema = z.object({

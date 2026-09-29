@@ -6,7 +6,7 @@ import { AppError } from "../../utils/AppError.js";
 import { parsePagination, paginated, escapeRegex } from "../../utils/query.js";
 import { registerHistoryProvider } from "./registry.js";
 import * as customerService from "./customer.service.js";
-import { sendEmail } from "./email.service.js";
+import { sendEmail, resolveAttachments } from "./email.service.js";
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
 
@@ -48,18 +48,20 @@ export async function logCommunication(tenantId, actor, input) {
  * Communication afterward so it also shows up in the customer's history
  * alongside calls/notes/etc.
  */
-export async function sendEmailToCustomer(tenantId, actor, { customer: customerId, subject, body }) {
+export async function sendEmailToCustomer(tenantId, actor, { customer: customerId, subject, body, attachments }) {
   const customer = await Customer.findOne({ _id: customerId, tenantId });
   if (!customer) throw AppError.badRequest("Unknown customer");
   const to = customer.primaryEmail;
   if (!to) throw AppError.badRequest("This customer has no email on file");
 
   const org = await Organization.findById(tenantId);
+  const resolvedAttachments = attachments?.length ? await resolveAttachments(tenantId, attachments) : undefined;
   await sendEmail(org?.code, {
     to,
     subject,
     html: body.replace(/\n/g, "<br>"),
     text: body,
+    attachments: resolvedAttachments,
   });
 
   return logCommunication(tenantId, actor, {
@@ -68,6 +70,7 @@ export async function sendEmailToCustomer(tenantId, actor, { customer: customerI
     direction: "outbound",
     subject,
     body,
+    attachments: (attachments || []).map((a) => ({ name: a.name, url: `/api/hrm/files/${a.id}` })),
     source: "manual",
   });
 }

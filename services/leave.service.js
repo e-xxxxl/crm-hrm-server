@@ -9,6 +9,7 @@ import { AppError } from "../utils/AppError.js";
 import { hasPermission } from "../utils/permissions.js";
 import { parsePagination, paginated } from "../utils/query.js";
 import { countLeaveDays, eachDayKey, dayKey as toDayKey } from "../utils/datetime.js";
+import { holidaysInRange } from "./holiday.service.js";
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
 const OPEN = ["Pending", "Manager Approved", "Clarification Requested"];
@@ -547,28 +548,35 @@ export async function calendar(orgId, query = {}) {
   if (query.branch) filter.branch = query.branch;
   if (query.department) filter.department = query.department;
 
-  const rows = await LeaveRequest.find(filter)
-    .populate("employee", "firstName lastName employeeId")
-    .populate("leaveType", "name code category")
-    .populate("branch", "name")
-    .sort({ startDate: 1 });
+  const [rows, holidays] = await Promise.all([
+    LeaveRequest.find(filter)
+      .populate("employee", "firstName lastName employeeId")
+      .populate("leaveType", "name code category")
+      .populate("branch", "name")
+      .sort({ startDate: 1 }),
+    holidaysInRange(orgId, from, to),
+  ]);
 
   return {
     from: from.toISOString().slice(0, 10),
     to: to.toISOString().slice(0, 10),
-    items: rows.map((r) => ({
-      id: r._id,
-      reference: r.reference,
-      employee: `${r.employee.firstName} ${r.employee.lastName}`,
-      employeeId: r.employee.employeeId,
-      leaveType: r.leaveType.name,
-      category: r.leaveType.category,
-      branch: r.branch?.name || null,
-      startDate: r.startDate.toISOString().slice(0, 10),
-      endDate: r.endDate.toISOString().slice(0, 10),
-      days: r.days,
-      status: r.status,
-    })),
+    items: [
+      ...rows.map((r) => ({
+        id: r._id,
+        kind: "leave",
+        reference: r.reference,
+        employee: `${r.employee.firstName} ${r.employee.lastName}`,
+        employeeId: r.employee.employeeId,
+        leaveType: r.leaveType.name,
+        category: r.leaveType.category,
+        branch: r.branch?.name || null,
+        startDate: r.startDate.toISOString().slice(0, 10),
+        endDate: r.endDate.toISOString().slice(0, 10),
+        days: r.days,
+        status: r.status,
+      })),
+      ...holidays,
+    ],
   };
 }
 

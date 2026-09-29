@@ -1,5 +1,7 @@
+import fs from "node:fs/promises";
 import { env } from "../../config/env.js";
 import { AppError } from "../../utils/AppError.js";
+import { getFileForDownload } from "../file.service.js";
 
 /**
  * Resolve which Resend key/from-address to send as for a brand. A
@@ -65,4 +67,29 @@ export async function sendEmail(brandCode, { to, subject, html, text, attachment
   return res.json();
 }
 
-export default { emailConfigured, sendEmail };
+/**
+ * Turn `[{ id, name }]` — files already uploaded through the shared
+ * `/hrm/files` endpoint (see FileInput.jsx) — into `[{ filename, content }]`
+ * Resend attachments. `id` is a StoredFile id, not a public URL, since the
+ * upload endpoint's own download link requires this app's auth; Resend
+ * needs the actual bytes, so they're fetched (Cloudinary) or read (legacy
+ * local disk) here rather than handed a URL Resend can't authenticate to.
+ */
+export async function resolveAttachments(orgId, attachments = []) {
+  const resolved = [];
+  for (const a of attachments) {
+    const { record, remoteUrl, filePath } = await getFileForDownload(orgId, a.id);
+    let content;
+    if (remoteUrl) {
+      const res = await fetch(remoteUrl);
+      if (!res.ok) throw AppError.badRequest(`Could not fetch attachment "${record.originalName}"`);
+      content = Buffer.from(await res.arrayBuffer());
+    } else {
+      content = await fs.readFile(filePath);
+    }
+    resolved.push({ filename: a.name || record.originalName || "attachment", content });
+  }
+  return resolved;
+}
+
+export default { emailConfigured, sendEmail, resolveAttachments };

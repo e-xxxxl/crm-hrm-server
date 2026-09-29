@@ -239,6 +239,7 @@ export async function listForDay(orgId, query = {}) {
             address: rec.clockOut.address,
             latitude: rec.clockOut.latitude,
             longitude: rec.clockOut.longitude,
+            withinGeofence: rec.clockOut.withinGeofence,
           }
         : null,
       totalHours: rec?.totalHours ?? null,

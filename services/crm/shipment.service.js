@@ -311,6 +311,14 @@ export async function shipmentStats(tenantId) {
   };
 }
 
+/** Permanently delete a shipment record — Super Admin only (enforced at the route level too). */
+export async function deleteShipment(tenantId, id) {
+  const shipment = await Shipment.findOne({ _id: id, tenantId });
+  if (!shipment) throw AppError.notFound("Shipment not found");
+  await shipment.deleteOne();
+  return { ok: true };
+}
+
 /* --------------------------- registry wiring --------------------------- */
 
 registerHistoryProvider("shipments", async (tenantId, customerId, opts = {}) => {
@@ -345,5 +353,6 @@ export default {
   assignRider,
   capturePod,
   remitCod,
+  deleteShipment,
   shipmentStats,
 };

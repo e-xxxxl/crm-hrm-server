@@ -78,4 +78,17 @@ export const remitCod = catchAsync(async (req, res) => {
   res.json({ data: shipment });
 });
 
-export default { list, stats, track, get, create, updateStatus, assignRider, capturePod, remitCod };
+export const remove = catchAsync(async (req, res) => {
+  const shipment = await service.getShipment(req.tenantId, req.params.id);
+  await service.deleteShipment(req.tenantId, req.params.id);
+  await recordAudit(req, {
+    action: "shipment.delete",
+    entityType: "Shipment",
+    entityId: req.params.id,
+    entityLabel: shipment.trackingNumber,
+    summary: `Deleted shipment ${shipment.trackingNumber}`,
+  });
+  res.json({ data: { ok: true } });
+});
+
+export default { list, stats, track, get, create, updateStatus, assignRider, capturePod, remitCod, remove };

@@ -3,7 +3,7 @@ import * as ctrl from "../../controllers/crm/shipment.controller.js";
 import { verifyToken } from "../../middleware/auth.js";
 import { scopeToTenant } from "../../middleware/orgScope.js";
 import { requireBrandKind } from "../../middleware/brandKind.js";
-import { checkPermission } from "../../middleware/rbac.js";
+import { checkPermission, requireRole } from "../../middleware/rbac.js";
 import { validate } from "../../middleware/validate.js";
 import {
   createShipmentSchema,
@@ -28,5 +28,6 @@ router.post("/:id/status", write, validate(shipmentStatusSchema), ctrl.updateSta
 router.post("/:id/assign-rider", dispatch, validate(assignRiderSchema), ctrl.assignRider);
 router.post("/:id/pod", write, validate(podSchema), ctrl.capturePod);
 router.post("/:id/remit-cod", checkPermission(["shipment:cod", "shipment:dispatch"], { mode: "any" }), ctrl.remitCod);
+router.delete("/:id", requireRole("Super Admin"), ctrl.remove);
 
 export default router;
