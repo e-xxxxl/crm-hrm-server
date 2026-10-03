@@ -12,6 +12,10 @@ dotenv.config();
 
 const NODE_ENV = process.env.NODE_ENV || "development";
 const isProd = NODE_ENV === "production";
+// True when the SPA is served from an https origin (see cookie defaults below).
+const httpsClient = (process.env.CLIENT_ORIGINS || "")
+  .split(",")
+  .some((o) => o.trim().toLowerCase().startsWith("https://"));
 
 /** Read a required string variable. */
 function required(name) {
@@ -79,9 +83,14 @@ export const env = {
     .filter(Boolean),
 
   // Cookie behaviour differs between local dev (http, same site) and prod
-  // (https, cross site on a different domain).
-  cookieSecure: optional("COOKIE_SECURE", isProd ? "true" : "false") === "true",
-  cookieSameSite: optional("COOKIE_SAMESITE", isProd ? "none" : "lax"),
+  // (https, cross site on a different domain). The refresh cookie only works
+  // cross-site as Secure + SameSite=None, so the defaults follow the real
+  // deployment shape — NODE_ENV=production *or* any https client origin —
+  // rather than depending on NODE_ENV alone. A host that doesn't set NODE_ENV
+  // used to fall back to SameSite=Lax/insecure, which silently drops the cookie
+  // on every cross-site request and signs everyone out on each page reload.
+  cookieSecure: optional("COOKIE_SECURE", isProd || httpsClient ? "true" : "false") === "true",
+  cookieSameSite: optional("COOKIE_SAMESITE", isProd || httpsClient ? "none" : "lax"),
   cookieDomain: optional("COOKIE_DOMAIN", ""),
 
   // File uploads — stored on Cloudinary (local disk doesn't survive a

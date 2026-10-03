@@ -208,7 +208,7 @@ export async function switchOrg(userId, organizationId, ctx = {}) {
  * session is replaced with a hash of the new token (single-use rotation).
  */
 export async function refresh(refreshToken, ctx = {}) {
-  if (!refreshToken) throw AppError.unauthorized("No refresh token");
+  if (!refreshToken) throw AppError.unauthorized("No refresh token", { code: "NO_REFRESH_COOKIE" });
 
   let decoded;
   try {
