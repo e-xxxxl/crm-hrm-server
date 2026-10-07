@@ -87,7 +87,7 @@ const businessSchema = new Schema(
 );
 
 businessSchema.index({ tenantId: 1, businessCode: 1 }, { unique: true });
-businessSchema.index({ tenantId: 1, externalRef: 1 }, { unique: true, sparse: true });
+businessSchema.index({ tenantId: 1, externalRef: 1 }, { unique: true, partialFilterExpression: { externalRef: { $type: "string" } } });
 businessSchema.index({ tenantId: 1, status: 1 });
 businessSchema.index({ tenantId: 1, category: 1, state: 1 });
 businessSchema.index({ name: "text", description: "text", services: "text" }, { name: "business_text" });

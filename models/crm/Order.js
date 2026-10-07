@@ -110,7 +110,7 @@ const orderSchema = new Schema(
 
 orderSchema.index({ tenantId: 1, orderNumber: 1 }, { unique: true });
 orderSchema.index({ tenantId: 1, trackingNumber: 1 }, { sparse: true });
-orderSchema.index({ tenantId: 1, externalRef: 1 }, { unique: true, sparse: true });
+orderSchema.index({ tenantId: 1, externalRef: 1 }, { unique: true, partialFilterExpression: { externalRef: { $type: "string" } } });
 orderSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
 
 orderSchema.set("toJSON", {

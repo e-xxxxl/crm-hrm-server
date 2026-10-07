@@ -143,7 +143,11 @@ const shipmentSchema = new Schema(
 );
 
 shipmentSchema.index({ tenantId: 1, trackingNumber: 1 }, { unique: true });
-shipmentSchema.index({ tenantId: 1, externalRef: 1 }, { unique: true, sparse: true });
+// `sparse` does nothing useful on a compound index whose first key (tenantId) is
+// always present — every shipment without an externalRef would be indexed as
+// (tenant, null) and the second one booked would fail as a duplicate. A partial
+// index only enforces uniqueness for records that actually have a string value.
+shipmentSchema.index({ tenantId: 1, externalRef: 1 }, { unique: true, partialFilterExpression: { externalRef: { $type: "string" } } });
 shipmentSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
 shipmentSchema.index({ tenantId: 1, rider: 1, status: 1 });
 shipmentSchema.index({ tenantId: 1, "recipient.phone": 1 });

@@ -57,8 +57,20 @@ export const assignRiderSchema = z.object({
 
 /* ---------- Invoices / receipts ---------- */
 
+export const INVOICE_NOTES_MAX_WORDS = 100;
+
+// The word cap is the real limit; the character cap is only a backstop against
+// absurdly long "words" so it can never be hit first by ordinary text.
+const invoiceNotes = z
+  .string()
+  .max(2000)
+  .refine((s) => (s.trim() ? s.trim().split(/\s+/).length : 0) <= INVOICE_NOTES_MAX_WORDS, {
+    message: `Notes are limited to ${INVOICE_NOTES_MAX_WORDS} words`,
+  });
+
 const lineItem = z.object({
   description: z.string().min(1).max(300),
+  // Fractional quantities are valid (e.g. 1.5 kg, 0.25 of a day).
   quantity: z.coerce.number().min(0).max(100000).default(1),
   unitPrice: z.coerce.number().min(0).max(1_000_000_000),
 });
@@ -69,14 +81,14 @@ export const createInvoiceSchema = z.object({
   lineItems: z.array(lineItem).min(1).max(100),
   currency: z.string().length(3).optional(),
   taxRate: z.coerce.number().min(0).max(100).optional(),
-  notes: z.string().max(1000).optional(),
+  notes: invoiceNotes.optional(),
   dueDate: z.coerce.date().optional(),
 });
 
 export const updateInvoiceSchema = z.object({
   lineItems: z.array(lineItem).min(1).max(100).optional(),
   taxRate: z.coerce.number().min(0).max(100).optional(),
-  notes: z.string().max(1000).optional(),
+  notes: invoiceNotes.optional(),
   dueDate: z.coerce.date().optional(),
 });
 

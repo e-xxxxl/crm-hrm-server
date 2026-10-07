@@ -76,7 +76,7 @@ const leadSchema = new Schema(
 );
 
 leadSchema.index({ tenantId: 1, reference: 1 }, { unique: true });
-leadSchema.index({ tenantId: 1, externalRef: 1 }, { unique: true, sparse: true });
+leadSchema.index({ tenantId: 1, externalRef: 1 }, { unique: true, partialFilterExpression: { externalRef: { $type: "string" } } });
 leadSchema.index({ tenantId: 1, stage: 1, updatedAt: -1 });
 leadSchema.index({ tenantId: 1, owner: 1, stage: 1 });
 

@@ -15,7 +15,7 @@ export function generateSecret(bytes = 20) {
   return base32Encode(buf);
 }
 
-export function otpauthURL({ secret, label, issuer = "CRM+HRM" }) {
+export function otpauthURL({ secret, label, issuer = "AJ Group Portal" }) {
   const params = new URLSearchParams({
     secret,
     issuer,

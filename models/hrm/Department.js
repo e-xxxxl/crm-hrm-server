@@ -22,7 +22,7 @@ const departmentSchema = new Schema(
 );
 
 departmentSchema.index({ organizationId: 1, name: 1 }, { unique: true });
-departmentSchema.index({ organizationId: 1, code: 1 }, { unique: true, sparse: true });
+departmentSchema.index({ organizationId: 1, code: 1 }, { unique: true, partialFilterExpression: { code: { $type: "string" } } });
 
 departmentSchema.set("toJSON", {
   virtuals: true,

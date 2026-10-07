@@ -37,7 +37,7 @@ const jobPostingSchema = new Schema(
   { timestamps: true },
 );
 
-jobPostingSchema.index({ organizationId: 1, reference: 1 }, { unique: true, sparse: true });
+jobPostingSchema.index({ organizationId: 1, reference: 1 }, { unique: true, partialFilterExpression: { reference: { $type: "string" } } });
 jobPostingSchema.index({ organizationId: 1, status: 1 });
 
 jobPostingSchema.set("toJSON", {

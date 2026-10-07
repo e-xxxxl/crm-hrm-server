@@ -96,7 +96,7 @@ const disciplinaryCaseSchema = new Schema(
   { timestamps: true },
 );
 
-disciplinaryCaseSchema.index({ organizationId: 1, reference: 1 }, { unique: true, sparse: true });
+disciplinaryCaseSchema.index({ organizationId: 1, reference: 1 }, { unique: true, partialFilterExpression: { reference: { $type: "string" } } });
 disciplinaryCaseSchema.index({ organizationId: 1, employee: 1, createdAt: -1 });
 
 disciplinaryCaseSchema.set("toJSON", {

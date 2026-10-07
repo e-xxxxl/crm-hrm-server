@@ -51,7 +51,7 @@ const branchSchema = new Schema(
 );
 
 branchSchema.index({ organizationId: 1, name: 1 }, { unique: true });
-branchSchema.index({ organizationId: 1, code: 1 }, { unique: true, sparse: true });
+branchSchema.index({ organizationId: 1, code: 1 }, { unique: true, partialFilterExpression: { code: { $type: "string" } } });
 branchSchema.index({ location: "2dsphere" });
 
 branchSchema.virtual("latitude").get(function () {

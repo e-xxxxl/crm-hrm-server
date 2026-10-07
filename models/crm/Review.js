@@ -46,7 +46,7 @@ const reviewSchema = new Schema(
 );
 
 reviewSchema.index({ tenantId: 1, business: 1, status: 1 });
-reviewSchema.index({ tenantId: 1, externalRef: 1 }, { unique: true, sparse: true });
+reviewSchema.index({ tenantId: 1, externalRef: 1 }, { unique: true, partialFilterExpression: { externalRef: { $type: "string" } } });
 reviewSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
 
 reviewSchema.set("toJSON", {
