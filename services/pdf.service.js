@@ -131,9 +131,17 @@ export async function generateInvoicePdf(invoice, organization) {
     }
     const titleX = logo ? left + 130 : left;
     doc.fontSize(16).font("Helvetica-Bold").text(organization?.name || "Organization", titleX, 50, { width: right - titleX });
-    if (organization?.address) {
-      doc.fontSize(9).font("Helvetica").fillColor("#555").text(organization.address, titleX, doc.y, { width: right - titleX });
-    }
+    // Contact details come from the organization's own profile, so each
+    // brand's invoices carry its own address/phone/email.
+    const contactLines = [
+      organization?.address,
+      [organization?.phone && `Tel: ${organization.phone}`, organization?.email && `Email: ${organization.email}`]
+        .filter(Boolean)
+        .join("   |   "),
+      organization?.website,
+    ].filter(Boolean);
+    doc.fontSize(9).font("Helvetica").fillColor("#555");
+    for (const line of contactLines) doc.text(line, titleX, doc.y, { width: right - titleX });
     doc.fillColor("#000");
 
     let y = Math.max(doc.y, headerBottom) + 14;

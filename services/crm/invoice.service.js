@@ -8,6 +8,20 @@ import { parsePagination, paginated } from "../../utils/query.js";
 import { generateInvoicePdf } from "../pdf.service.js";
 import { sendEmail } from "./email.service.js";
 
+const esc = (s) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+/** Contact block for the end of an outgoing email, from the organization's profile. */
+function signature(org) {
+  const lines = [
+    org?.name && `<strong>${esc(org.name)}</strong>`,
+    org?.address && esc(org.address),
+    org?.phone && `Tel: ${esc(org.phone)}`,
+    org?.email && `Email: ${esc(org.email)}`,
+  ].filter(Boolean);
+  return lines.length ? `<p style="color:#555;font-size:13px">${lines.join("<br>")}</p>` : "";
+}
+
 function formatAddress(a) {
   if (!a) return undefined;
   return [a.line1, a.line2, a.city, a.state].filter(Boolean).join(", ") || undefined;
@@ -132,7 +146,11 @@ export async function sendInvoice(tenantId, id, { to } = {}) {
   await sendEmail(org?.code, {
     to: recipient,
     subject: `${label} ${invoice.number} from ${org?.name || "us"}`,
-    html: `<p>Hi ${invoice.customerSnapshot?.name || "there"},</p><p>Please find your ${label.toLowerCase()} attached.</p><p>Total: ${invoice.currency} ${invoice.total.toLocaleString("en-NG")}</p>`,
+    html:
+      `<p>Hi ${esc(invoice.customerSnapshot?.name || "there")},</p>` +
+      `<p>Please find your ${label.toLowerCase()} attached.</p>` +
+      `<p>Total: ${esc(invoice.currency)} ${invoice.total.toLocaleString("en-NG")}</p>` +
+      signature(org),
     attachments: [{ filename: `${invoice.number}.pdf`, content: pdf }],
   });
 

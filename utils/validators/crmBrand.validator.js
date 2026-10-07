@@ -57,13 +57,13 @@ export const assignRiderSchema = z.object({
 
 /* ---------- Invoices / receipts ---------- */
 
-export const INVOICE_NOTES_MAX_WORDS = 100;
+export const INVOICE_NOTES_MAX_WORDS = 300;
 
 // The word cap is the real limit; the character cap is only a backstop against
 // absurdly long "words" so it can never be hit first by ordinary text.
 const invoiceNotes = z
   .string()
-  .max(2000)
+  .max(6000)
   .refine((s) => (s.trim() ? s.trim().split(/\s+/).length : 0) <= INVOICE_NOTES_MAX_WORDS, {
     message: `Notes are limited to ${INVOICE_NOTES_MAX_WORDS} words`,
   });

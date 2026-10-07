@@ -35,7 +35,7 @@ const invoiceSchema = new Schema(
     taxAmount: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
 
-    notes: { type: String, trim: true, maxlength: 2000 },
+    notes: { type: String, trim: true, maxlength: 6000 },
     dueDate: { type: Date },
 
     status: { type: String, enum: ["draft", "sent", "paid", "void"], default: "draft" },
