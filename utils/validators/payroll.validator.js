@@ -21,6 +21,7 @@ export const salaryStructureSchema = z.object({
   exGratia: money.optional(),
   referralBonus: money.optional(),
   overtime: money.optional(),
+  thirteenthMonth: money.optional(),
   latenessDeduction: money.optional(),
   otherDeductions: money.optional(),
   customEarnings: z.array(customEarning).max(20).optional(),

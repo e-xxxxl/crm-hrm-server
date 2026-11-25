@@ -38,6 +38,7 @@ const salaryStructureSchema = new Schema(
     exGratia: { type: Number, default: 0, min: 0 },
     referralBonus: { type: Number, default: 0, min: 0 },
     overtime: { type: Number, default: 0, min: 0 }, // not taxed — excluded from the PAYE base like the other allowances above
+    thirteenthMonth: { type: Number, default: 0, min: 0 }, // 13th month salary — same treatment as overtime: paid in gross, not taxed
     customEarnings: { type: [customComponent], default: [] },
 
     // Recurring deductions (monthly). Post-tax — they reduce net pay, not the
@@ -70,7 +71,7 @@ salaryStructureSchema.virtual("fixedGross").get(function () {
   const custom = (this.customEarnings || []).reduce((s, c) => s + (c.amount || 0), 0);
   const components =
     this.basic + this.housing + this.transport + this.subsidy + this.dataAllowance +
-    this.exGratia + this.referralBonus + this.overtime + custom;
+    this.exGratia + this.referralBonus + this.overtime + this.thirteenthMonth + custom;
   return this.grossMonthly > 0 && components === 0 ? this.grossMonthly : components || this.grossMonthly;
 });
 

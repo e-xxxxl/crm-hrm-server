@@ -57,7 +57,13 @@ export function errorHandler(err, req, res, next) {
   if (status >= 500) {
     logger.error(`${req.method} ${req.originalUrl} —`, err);
   } else {
-    logger.warn(`${req.method} ${req.originalUrl} — ${status} ${code}: ${message}`);
+    // For validation failures also record which fields were rejected (path and
+    // reason only, never the submitted values) so a bare "validation failed"
+    // report can be traced from the server logs.
+    const why = Array.isArray(details) && code === "VALIDATION_ERROR"
+      ? ` [${details.map((d) => `${d.path}: ${d.message}`).join("; ").slice(0, 400)}]`
+      : "";
+    logger.warn(`${req.method} ${req.originalUrl} — ${status} ${code}: ${message}${why}`);
   }
 
   const body = { error: { code, message } };

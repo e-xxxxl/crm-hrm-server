@@ -138,7 +138,7 @@ export async function invoicePdf(tenantId, id) {
 export async function sendInvoice(tenantId, id, { to } = {}) {
   const invoice = await getInvoice(tenantId, id);
   const org = await Organization.findById(tenantId);
-  const recipient = to || invoice.customerSnapshot?.email;
+  const recipient = (to || invoice.customerSnapshot?.email || "").split(/[,;\s]+/).find(Boolean);
   if (!recipient) throw AppError.badRequest("This customer has no email on file — provide one to send to");
 
   const pdf = await pdfFor(tenantId, invoice);

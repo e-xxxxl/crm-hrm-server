@@ -69,7 +69,7 @@ const invoiceNotes = z
   });
 
 const lineItem = z.object({
-  description: z.string().min(1).max(300),
+  description: z.string().trim().min(1).max(500),
   // Fractional quantities are valid (e.g. 1.5 kg, 0.25 of a day).
   quantity: z.coerce.number().min(0).max(100000).default(1),
   unitPrice: z.coerce.number().min(0).max(1_000_000_000),
@@ -96,8 +96,16 @@ export const invoiceStatusSchema = z.object({
   status: z.enum(["draft", "sent", "paid", "void"]),
 });
 
+// Customer records sometimes hold two addresses in one field ("a@x.com; b@x.com")
+// or stray whitespace. Send to the first one instead of rejecting the request.
+const firstEmail = (v) => {
+  if (typeof v !== "string") return v;
+  const first = v.split(/[,;\s]+/).find(Boolean);
+  return first || undefined;
+};
+
 export const sendInvoiceSchema = z.object({
-  to: z.string().email().optional(),
+  to: z.preprocess(firstEmail, z.string().email("Enter a valid email address, e.g. name@example.com").optional()),
 });
 
 export const podSchema = z.object({
